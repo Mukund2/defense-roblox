@@ -1,0 +1,244 @@
+--!strict
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local TycoonConfig = require(ReplicatedStorage.TycoonConfig) :: any
+local Remotes = require(ReplicatedStorage.Remotes) :: any
+local DataManager = require(script.Parent.DataManager) :: any
+local TycoonBuilder = require(script.Parent.TycoonBuilder) :: any
+local IncomeManager = require(script.Parent.IncomeManager) :: any
+local UnitManager = require(script.Parent.UnitManager) :: any
+
+-- ── Types ─────────────────────────────────────────────────────────────────────
+
+type TycoonState = {
+	pad: number,
+	balance: number,
+	incomePerSecond: number,
+	unlockedItems: { string },
+	lastSave: number,
+}
+
+-- ── State ─────────────────────────────────────────────────────────────────────
+
+local tycoons: { [Player]: TycoonState } = {}
+
+-- Track which pads are in use so we can assign the next free one.
+local padInUse: { [number]: boolean } = {
+	[1] = false,
+	[2] = false,
+	[3] = false,
+	[4] = false,
+}
+
+local MAX_PADS = 4
+
+-- ── Helpers ───────────────────────────────────────────────────────────────────
+
+local function getFreePad(): number?
+	for i = 1, MAX_PADS do
+		if not padInUse[i] then
+			return i
+		end
+	end
+	return nil
+end
+
+local function isUnlocked(unlockedItems: { string }, itemName: string): boolean
+	for _, name in unlockedItems do
+		if name == itemName then
+			return true
+		end
+	end
+	return false
+end
+
+--- Return the item that should be next in sequence (lowest order not yet unlocked).
+local function nextItemInSequence(unlockedItems: { string }): any?
+	for _, item in ipairs(TycoonConfig.Ordered) do
+		if not isUnlocked(unlockedItems, item.modelName) then
+			return item
+		end
+	end
+	return nil
+end
+
+local function fireUpdateMoney(player: Player, balance: number)
+	Remotes.UpdateMoney:FireClient(player, balance)
+end
+
+-- ── Income tick callback ───────────────────────────────────────────────────────
+
+IncomeManager.SetTickCallback(function(player: Player, amount: number)
+	local state = tycoons[player]
+	if not state then
+		return
+	end
+	state.balance += amount
+	state.lastSave = state.lastSave -- keep reference (actual save is on leave)
+	fireUpdateMoney(player, state.balance)
+end)
+
+-- ── Player join ───────────────────────────────────────────────────────────────
+
+local function onPlayerAdded(player: Player)
+	local padNumber = getFreePad()
+	if padNumber == nil then
+		warn("[TycoonManager] No free pads for " .. player.Name .. ". Server is full.")
+		player:Kick("The server is full — all tycoon pads are occupied. Please try again later.")
+		return
+	end
+
+	padInUse[padNumber] = true
+
+	-- Load persistent data
+	local data = DataManager.LoadData(player)
+
+	local state: TycoonState = {
+		pad = padNumber,
+		balance = data.balance,
+		incomePerSecond = data.incomePerSecond,
+		unlockedItems = data.unlockedItems,
+		lastSave = os.time(),
+	}
+	tycoons[player] = state
+
+	-- Build the tycoon in the world
+	TycoonBuilder.SetupTycoonPad(padNumber, player)
+
+	-- Register the pad with UnitManager so it knows the world-space center.
+	-- Pad centers are spaced PAD_SPACING studs apart along X (matches TycoonBuilder).
+	local PAD_SPACING = 300
+	local padCenter = CFrame.new(Vector3.new((padNumber - 1) * PAD_SPACING, 0, 0))
+	UnitManager.RegisterPad(padNumber, player, padCenter)
+
+	-- Re-spawn all previously unlocked buildings (skip CommandCenter — already placed by SetupTycoonPad)
+	for _, itemName in state.unlockedItems do
+		if itemName ~= "CommandCenter" then
+			TycoonBuilder.UnlockItem(padNumber, itemName, state.unlockedItems)
+		end
+	end
+
+	-- Re-spawn units for all previously unlocked items that have associated units.
+	for _, itemName in state.unlockedItems do
+		local item = TycoonConfig.Items[itemName]
+		if item then
+			local unitSpec = require(ReplicatedStorage.UnitConfig).ByTier[item.order]
+			if unitSpec then
+				UnitManager.SpawnUnit(padNumber, unitSpec.name)
+			end
+		end
+	end
+
+	-- Show the correct next purchase button
+	TycoonBuilder.SpawnPurchaseButtons(padNumber, state.unlockedItems)
+
+	-- Start income loop
+	IncomeManager.StartIncome(player, state.incomePerSecond)
+
+	-- Send initial state to the client
+	fireUpdateMoney(player, state.balance)
+	Remotes.UpdateIncome:FireClient(player, state.incomePerSecond)
+
+	print(string.format("[TycoonManager] %s joined → pad %d | $%d | %d ips", player.Name, padNumber, state.balance, state.incomePerSecond))
+end
+
+-- ── Player leave ──────────────────────────────────────────────────────────────
+
+local function onPlayerRemoving(player: Player)
+	local state = tycoons[player]
+	if not state then
+		return
+	end
+
+	-- Stop the income loop first so no more ticks fire
+	IncomeManager.StopIncome(player)
+
+	-- Persist data
+	DataManager.SaveData(player, {
+		balance = state.balance,
+		incomePerSecond = state.incomePerSecond,
+		unlockedItems = state.unlockedItems,
+		totalEarned = 0, -- totalEarned tracked separately if needed
+	})
+
+	-- Clean up units and the world
+	UnitManager.DespawnAllUnits(state.pad)
+	TycoonBuilder.CleanupTycoon(state.pad)
+
+	-- Free the pad
+	padInUse[state.pad] = false
+
+	tycoons[player] = nil
+
+	print(string.format("[TycoonManager] %s left → pad %d freed | saved $%d", player.Name, state.pad, state.balance))
+end
+
+-- ── Purchase handler ──────────────────────────────────────────────────────────
+
+local function onPurchaseRequest(player: Player, itemName: string)
+	local state = tycoons[player]
+	if not state then
+		warn("[TycoonManager] Purchase from unregistered player: " .. player.Name)
+		return
+	end
+
+	-- Validate: item must exist in config
+	local item = TycoonConfig.Items[itemName]
+	if not item then
+		warn(string.format("[TycoonManager] %s requested unknown item '%s'", player.Name, tostring(itemName)))
+		return
+	end
+
+	-- Validate: must be next in sequence (linear progression)
+	local nextItem = nextItemInSequence(state.unlockedItems)
+	if nextItem == nil or nextItem.modelName ~= itemName then
+		warn(string.format("[TycoonManager] %s tried to skip progression (wanted '%s', next is '%s')", player.Name, itemName, if nextItem then nextItem.modelName else "none"))
+		return
+	end
+
+	-- Validate: sufficient funds
+	if state.balance < item.cost then
+		-- Silently reject; the client UI should prevent this but we guard server-side
+		return
+	end
+
+	-- Deduct cost
+	state.balance -= item.cost
+
+	-- Record unlock
+	table.insert(state.unlockedItems, itemName)
+
+	-- Update income rate
+	state.incomePerSecond += item.incomePerSecond
+	IncomeManager.UpdateRate(player, state.incomePerSecond)
+
+	-- Update the world
+	TycoonBuilder.UnlockItem(state.pad, itemName, state.unlockedItems)
+
+	-- Spawn the associated unit if this item's order tier maps to one.
+	local unitSpec = require(ReplicatedStorage.UnitConfig).ByTier[item.order]
+	if unitSpec then
+		UnitManager.SpawnUnit(state.pad, unitSpec.name)
+	end
+
+	-- Notify client
+	Remotes.UnlockItem:FireClient(player, item.name, item.description)
+	Remotes.UpdateIncome:FireClient(player, state.incomePerSecond)
+	fireUpdateMoney(player, state.balance)
+
+	print(string.format("[TycoonManager] %s purchased '%s' for $%d | balance: $%d | ips: %d", player.Name, itemName, item.cost, state.balance, state.incomePerSecond))
+end
+
+-- ── Wire up events ────────────────────────────────────────────────────────────
+
+Players.PlayerAdded:Connect(onPlayerAdded)
+Players.PlayerRemoving:Connect(onPlayerRemoving)
+
+Remotes.PurchaseItem.OnServerEvent:Connect(onPurchaseRequest)
+
+-- Handle players who joined before this script loaded (Studio play-solo edge case)
+for _, player in Players:GetPlayers() do
+	task.spawn(onPlayerAdded, player)
+end
