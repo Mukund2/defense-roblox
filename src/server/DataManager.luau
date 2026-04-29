@@ -67,7 +67,14 @@ function DataManager.LoadData(player: Player): PlayerData
 			end
 			break
 		else
-			warn(string.format("[DataManager] LoadData attempt %d failed for %s: %s", attempt, player.Name, tostring(data)))
+			warn(
+				string.format(
+					"[DataManager] LoadData attempt %d failed for %s: %s",
+					attempt,
+					player.Name,
+					tostring(data)
+				)
+			)
 			if attempt < MAX_RETRIES then
 				task.wait(RETRY_DELAY)
 			end
@@ -102,7 +109,14 @@ function DataManager.SaveData(player: Player, data: PlayerData): boolean
 		if ok then
 			return true
 		else
-			warn(string.format("[DataManager] SaveData attempt %d failed for %s: %s", attempt, player.Name, tostring(err)))
+			warn(
+				string.format(
+					"[DataManager] SaveData attempt %d failed for %s: %s",
+					attempt,
+					player.Name,
+					tostring(err)
+				)
+			)
 			if attempt < MAX_RETRIES then
 				task.wait(RETRY_DELAY)
 			end

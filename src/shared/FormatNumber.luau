@@ -32,7 +32,7 @@ local function addCommas(intStr: string): string
 	local result = {}
 	local len = #intStr
 	for i = 1, len do
-		local fromRight = len - i  -- 0-indexed distance from the right
+		local fromRight = len - i -- 0-indexed distance from the right
 		if fromRight > 0 and fromRight % 3 == 0 then
 			table.insert(result, ",")
 		end

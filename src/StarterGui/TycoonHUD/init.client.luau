@@ -14,16 +14,16 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ── Design tokens ─────────────────────────────────────────────────────────────
 local COLOR = {
-	BG_DARK      = Color3.fromRGB(20, 25, 35),
-	BG_PANEL     = Color3.fromRGB(14, 18, 26),
-	GREEN        = Color3.fromRGB(74, 124, 89),   -- military green
-	GREEN_LIGHT  = Color3.fromRGB(100, 180, 120),
-	GREEN_DIM    = Color3.fromRGB(50, 85, 60),
-	AMBER        = Color3.fromRGB(200, 155, 60),
-	WHITE        = Color3.fromRGB(240, 240, 240),
-	GRAY         = Color3.fromRGB(160, 170, 180),
+	BG_DARK = Color3.fromRGB(20, 25, 35),
+	BG_PANEL = Color3.fromRGB(14, 18, 26),
+	GREEN = Color3.fromRGB(74, 124, 89), -- military green
+	GREEN_LIGHT = Color3.fromRGB(100, 180, 120),
+	GREEN_DIM = Color3.fromRGB(50, 85, 60),
+	AMBER = Color3.fromRGB(200, 155, 60),
+	WHITE = Color3.fromRGB(240, 240, 240),
+	GRAY = Color3.fromRGB(160, 170, 180),
 	STROKE_GREEN = Color3.fromRGB(60, 100, 72),
-	TRANSPARENT  = Color3.fromRGB(0, 0, 0),
+	TRANSPARENT = Color3.fromRGB(0, 0, 0),
 }
 
 local MAX_BASE_LEVEL = 15
@@ -46,9 +46,9 @@ end
 
 local function applyPadding(parent: Instance, h: number, v: number)
 	local pad = Instance.new("UIPadding")
-	pad.PaddingLeft   = UDim.new(0, h)
-	pad.PaddingRight  = UDim.new(0, h)
-	pad.PaddingTop    = UDim.new(0, v)
+	pad.PaddingLeft = UDim.new(0, h)
+	pad.PaddingRight = UDim.new(0, h)
+	pad.PaddingTop = UDim.new(0, v)
 	pad.PaddingBottom = UDim.new(0, v)
 	pad.Parent = parent
 end
@@ -113,27 +113,16 @@ TopBarLayout.Padding = UDim.new(0, 8)
 TopBarLayout.Parent = TopBar
 
 -- Dollar icon
-local DollarIcon = newLabel(
-	TopBar, "DollarIcon", "$",
-	Enum.Font.GothamBold, 28, COLOR.GREEN,
-	COLOR.TRANSPARENT, 1
-)
+local DollarIcon = newLabel(TopBar, "DollarIcon", "$", Enum.Font.GothamBold, 28, COLOR.GREEN, COLOR.TRANSPARENT, 1)
 DollarIcon.Size = UDim2.new(0, 28, 1, 0)
 
 -- Money amount
-local MoneyLabel = newLabel(
-	TopBar, "MoneyLabel", "0",
-	Enum.Font.GothamBold, 26, COLOR.WHITE,
-	COLOR.TRANSPARENT, 1
-)
+local MoneyLabel = newLabel(TopBar, "MoneyLabel", "0", Enum.Font.GothamBold, 26, COLOR.WHITE, COLOR.TRANSPARENT, 1)
 MoneyLabel.Size = UDim2.new(0, 160, 1, 0)
 
 -- Income rate
-local IncomeLabel = newLabel(
-	TopBar, "IncomeLabel", "+$0/sec",
-	Enum.Font.GothamMedium, 14, COLOR.GREEN_LIGHT,
-	COLOR.TRANSPARENT, 1
-)
+local IncomeLabel =
+	newLabel(TopBar, "IncomeLabel", "+$0/sec", Enum.Font.GothamMedium, 14, COLOR.GREEN_LIGHT, COLOR.TRANSPARENT, 1)
 IncomeLabel.Size = UDim2.new(0, 90, 1, 0)
 
 -- ═════════════════════════════════════════════════════════════════════════════
@@ -160,9 +149,14 @@ BaseLevelLayout.Padding = UDim.new(0, 5)
 BaseLevelLayout.Parent = BottomPanel
 
 local BaseLevelLabel = newLabel(
-	BottomPanel, "BaseLevelLabel", "BASE LEVEL: 0 / " .. MAX_BASE_LEVEL,
-	Enum.Font.GothamMedium, 13, COLOR.GRAY,
-	COLOR.TRANSPARENT, 1
+	BottomPanel,
+	"BaseLevelLabel",
+	"BASE LEVEL: 0 / " .. MAX_BASE_LEVEL,
+	Enum.Font.GothamMedium,
+	13,
+	COLOR.GRAY,
+	COLOR.TRANSPARENT,
+	1
 )
 BaseLevelLabel.Size = UDim2.new(1, 0, 0, 18)
 BaseLevelLabel.TextXAlignment = Enum.TextXAlignment.Left
@@ -179,7 +173,7 @@ applyStroke(BarContainer, COLOR.GREEN_DIM, 1)
 
 local ProgressFill = Instance.new("Frame")
 ProgressFill.Name = "ProgressFill"
-ProgressFill.Size = UDim2.new(0, 0, 1, 0)   -- width updated via UpdateBaseLevel
+ProgressFill.Size = UDim2.new(0, 0, 1, 0) -- width updated via UpdateBaseLevel
 ProgressFill.BackgroundColor3 = COLOR.GREEN
 ProgressFill.BorderSizePixel = 0
 ProgressFill.Parent = BarContainer
@@ -192,7 +186,7 @@ applyCorner(ProgressFill, 4)
 local NotifFrame = Instance.new("Frame")
 NotifFrame.Name = "NotifFrame"
 NotifFrame.AnchorPoint = Vector2.new(0.5, 0)
-NotifFrame.Position = UDim2.new(0.5, 0, 0, -160)  -- starts off-screen above
+NotifFrame.Position = UDim2.new(0.5, 0, 0, -160) -- starts off-screen above
 NotifFrame.Size = UDim2.new(0, 360, 0, 130)
 NotifFrame.BackgroundColor3 = COLOR.BG_PANEL
 NotifFrame.BackgroundTransparency = 0.08
@@ -211,29 +205,19 @@ NotifLayout.Padding = UDim.new(0, 6)
 NotifLayout.Parent = NotifFrame
 
 -- "ITEM UNLOCKED" header
-local NotifHeader = newLabel(
-	NotifFrame, "NotifHeader", "ITEM UNLOCKED",
-	Enum.Font.GothamBold, 13, COLOR.AMBER,
-	COLOR.TRANSPARENT, 1
-)
+local NotifHeader =
+	newLabel(NotifFrame, "NotifHeader", "ITEM UNLOCKED", Enum.Font.GothamBold, 13, COLOR.AMBER, COLOR.TRANSPARENT, 1)
 NotifHeader.Size = UDim2.new(1, 0, 0, 18)
 NotifHeader.TextXAlignment = Enum.TextXAlignment.Center
 
 -- Item name
-local NotifItemName = newLabel(
-	NotifFrame, "NotifItemName", "",
-	Enum.Font.GothamBold, 22, COLOR.WHITE,
-	COLOR.TRANSPARENT, 1
-)
+local NotifItemName =
+	newLabel(NotifFrame, "NotifItemName", "", Enum.Font.GothamBold, 22, COLOR.WHITE, COLOR.TRANSPARENT, 1)
 NotifItemName.Size = UDim2.new(1, 0, 0, 28)
 NotifItemName.TextXAlignment = Enum.TextXAlignment.Center
 
 -- Description
-local NotifDesc = newLabel(
-	NotifFrame, "NotifDesc", "",
-	Enum.Font.GothamMedium, 12, COLOR.GRAY,
-	COLOR.TRANSPARENT, 1
-)
+local NotifDesc = newLabel(NotifFrame, "NotifDesc", "", Enum.Font.GothamMedium, 12, COLOR.GRAY, COLOR.TRANSPARENT, 1)
 NotifDesc.Size = UDim2.new(1, 0, 0, 38)
 NotifDesc.TextWrapped = true
 NotifDesc.TextXAlignment = Enum.TextXAlignment.Center
@@ -243,10 +227,10 @@ NotifDesc.TextXAlignment = Enum.TextXAlignment.Center
 -- ═════════════════════════════════════════════════════════════════════════════
 
 -- Shared tween info constants
-local MONEY_TWEEN_INFO  = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-local NOTIF_TWEEN_INFO  = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-local NOTIF_OUT_INFO    = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
-local LEVEL_TWEEN_INFO  = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local MONEY_TWEEN_INFO = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local NOTIF_TWEEN_INFO = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+local NOTIF_OUT_INFO = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+local LEVEL_TWEEN_INFO = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 -- Notification queue to prevent overlapping popups.
 local notifQueue: { { itemName: string, description: string } } = {}
@@ -330,8 +314,8 @@ end
 -- ── Publish API ───────────────────────────────────────────────────────────────
 -- TycoonClient polls _G.TycoonHUD until it's set.
 _G.TycoonHUD = {
-	UpdateMoney            = UpdateMoney,
-	UpdateIncome           = UpdateIncome,
+	UpdateMoney = UpdateMoney,
+	UpdateIncome = UpdateIncome,
 	ShowUnlockNotification = ShowUnlockNotification,
-	UpdateBaseLevel        = UpdateBaseLevel,
+	UpdateBaseLevel = UpdateBaseLevel,
 }

@@ -6,20 +6,18 @@
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
-local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- ── Remote references ────────────────────────────────────────────────────────
 -- Remotes module is the single source of truth; it blocks until the server
 -- has created all remotes so no extra WaitForChild calls are needed here.
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes", 30) :: ModuleScript)
 
-local ClaimTycoon  = Remotes.ClaimTycoon
-local UpdateMoney  = Remotes.UpdateMoney
+local ClaimTycoon = Remotes.ClaimTycoon
+local UpdateMoney = Remotes.UpdateMoney
 local UpdateIncome = Remotes.UpdateIncome
-local UnlockItem   = Remotes.UnlockItem
+local UnlockItem = Remotes.UnlockItem
 local PurchaseItem = Remotes.PurchaseItem
 
 -- ── HUD API (loaded after StarterGui scripts have run) ───────────────────────
@@ -31,7 +29,8 @@ local HUD: {
 	UpdateIncome: (rate: number) -> (),
 	ShowUnlockNotification: (itemName: string, description: string) -> (),
 	UpdateBaseLevel: (level: number) -> (),
-} | nil = nil
+} | nil =
+	nil
 
 task.spawn(function()
 	-- Wait up to 10 s for the HUD module to register itself.
@@ -76,7 +75,9 @@ end
 -- Returns the root part of the local character if available.
 local function getCharacterRoot(): BasePart?
 	local character = LocalPlayer.Character
-	if not character then return nil end
+	if not character then
+		return nil
+	end
 	return character:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
@@ -86,15 +87,21 @@ local PURCHASE_COOLDOWN = 2 -- seconds
 
 local function onButtonTouched(button: BasePart, character: Model)
 	local itemName = button:GetAttribute("TycoonItem") :: string?
-	if not itemName or itemName == "" then return end
+	if not itemName or itemName == "" then
+		return
+	end
 
 	local now = os.clock()
 	local lastTime = recentPurchases[itemName]
-	if lastTime and (now - lastTime) < PURCHASE_COOLDOWN then return end
+	if lastTime and (now - lastTime) < PURCHASE_COOLDOWN then
+		return
+	end
 
 	-- Verify the touching part belongs to the local character.
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if not humanoid or humanoid.Health <= 0 then return end
+	if not humanoid or humanoid.Health <= 0 then
+		return
+	end
 
 	recentPurchases[itemName] = now
 	PurchaseItem:FireServer(itemName)

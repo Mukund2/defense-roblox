@@ -6,11 +6,11 @@ export type UnitSpec = {
 	name: string,
 	displayName: string,
 	category: UnitCategory,
-	speed: number,          -- studs per second
-	patrolRadius: number,   -- studs
-	patrolHeight: number,   -- studs (0 for ground/naval units)
+	speed: number, -- studs per second
+	patrolRadius: number, -- studs
+	patrolHeight: number, -- studs (0 for ground/naval units)
 	description: string,
-	tier: number,           -- tycoon order index that unlocks this unit
+	tier: number, -- tycoon order index that unlocks this unit
 }
 
 export type UnitConfigType = {

@@ -4,17 +4,15 @@
 -- control to the default Roblox camera.
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
 -- ── Configuration ─────────────────────────────────────────────────────────────
-local FLYOVER_DURATION = 3.0  -- seconds for the full sweep
-local OVERVIEW_HEIGHT  = 180  -- studs above world origin for the start position
-local OVERVIEW_OFFSET  = 160  -- horizontal offset so we look across the base
+local FLYOVER_DURATION = 3.0 -- seconds for the full sweep
+local OVERVIEW_HEIGHT = 180 -- studs above world origin for the start position
+local OVERVIEW_OFFSET = 160 -- horizontal offset so we look across the base
 
 -- ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -61,18 +59,10 @@ local function runFlyover()
 	local padPos = padCFrame.Position
 
 	-- Start position: high and offset, looking down toward the pad.
-	local startPos = Vector3.new(
-		padPos.X + OVERVIEW_OFFSET,
-		padPos.Y + OVERVIEW_HEIGHT,
-		padPos.Z + OVERVIEW_OFFSET
-	)
+	local startPos = Vector3.new(padPos.X + OVERVIEW_OFFSET, padPos.Y + OVERVIEW_HEIGHT, padPos.Z + OVERVIEW_OFFSET)
 
 	-- End position: lower and closer, almost at pad level.
-	local endPos = Vector3.new(
-		padPos.X + 20,
-		padPos.Y + 35,
-		padPos.Z + 20
-	)
+	local endPos = Vector3.new(padPos.X + 20, padPos.Y + 35, padPos.Z + 20)
 
 	Camera.CFrame = CFrame.lookAt(startPos, padPos)
 
@@ -84,9 +74,7 @@ local function runFlyover()
 		elapsed += dt
 		local alpha = math.clamp(elapsed / FLYOVER_DURATION, 0, 1)
 		-- Ease-in-out cubic for a cinematic feel.
-		local t = alpha < 0.5
-			and 4 * alpha * alpha * alpha
-			or 1 - (-2 * alpha + 2) ^ 3 / 2
+		local t = alpha < 0.5 and 4 * alpha * alpha * alpha or 1 - (-2 * alpha + 2) ^ 3 / 2
 
 		local currentPos = startPos:Lerp(endPos, t)
 		-- Look-at target also lerps slightly inward so the camera pans naturally.
@@ -106,7 +94,9 @@ end
 local hasFired = false
 
 local function onCharacterAdded(_character: Model)
-	if hasFired then return end
+	if hasFired then
+		return
+	end
 	hasFired = true
 
 	-- Small delay so the world has a chance to load before we start the sweep.

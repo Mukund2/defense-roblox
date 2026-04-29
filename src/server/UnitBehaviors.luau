@@ -145,7 +145,13 @@ end
 	velocity) to look more like a real aircraft rather than a flat plate gliding
 	around.
 --]]
-function UnitBehaviors.PatrolAir(part: BasePart, center: CFrame, speed: number, radius: number, height: number): CleanupFn
+function UnitBehaviors.PatrolAir(
+	part: BasePart,
+	center: CFrame,
+	speed: number,
+	radius: number,
+	height: number
+): CleanupFn
 	-- Ellipse: X radius = radius, Z radius = radius * 0.65 (elongated circuit)
 	local radiusX = radius
 	local radiusZ = radius * 0.65

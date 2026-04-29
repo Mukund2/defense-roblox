@@ -26,21 +26,21 @@ local IS_SERVER = RunService:IsServer()
 
 export type RemotesType = {
 	-- Client → Server
-	ClaimTycoon: RemoteEvent,    -- Fired when a player clicks a base pad to claim it.
-	PurchaseItem: RemoteEvent,   -- Fired when a player activates a purchase button.
-	                             --   args: itemName: string
+	ClaimTycoon: RemoteEvent, -- Fired when a player clicks a base pad to claim it.
+	PurchaseItem: RemoteEvent, -- Fired when a player activates a purchase button.
+	--   args: itemName: string
 
 	-- Server → Client
-	UpdateMoney: RemoteEvent,    -- Tells the client their current cash balance.
-	                             --   args: amount: number
-	UpdateIncome: RemoteEvent,   -- Tells the client their current income rate.
-	                             --   args: perSecond: number
-	UnlockItem: RemoteEvent,     -- Tells the client a tycoon item was just unlocked.
-	                             --   args: itemName: string
+	UpdateMoney: RemoteEvent, -- Tells the client their current cash balance.
+	--   args: amount: number
+	UpdateIncome: RemoteEvent, -- Tells the client their current income rate.
+	--   args: perSecond: number
+	UnlockItem: RemoteEvent, -- Tells the client a tycoon item was just unlocked.
+	--   args: itemName: string
 
 	-- Client → Server (with response)
 	GetPlayerData: RemoteFunction, -- Client requests its full save data snapshot.
-	                               --   returns: { money: number, income: number, unlockedItems: {string} }
+	--   returns: { money: number, income: number, unlockedItems: {string} }
 }
 
 -- ── Helpers ────────────────────────────────────────────────────────────────
@@ -78,11 +78,11 @@ end
 -- ── Remote construction ───────────────────────────────────────────────────
 
 local Remotes: RemotesType = table.freeze({
-	ClaimTycoon   = getOrCreate(folder, "RemoteEvent",    "ClaimTycoon")   :: RemoteEvent,
-	PurchaseItem  = getOrCreate(folder, "RemoteEvent",    "PurchaseItem")  :: RemoteEvent,
-	UpdateMoney   = getOrCreate(folder, "RemoteEvent",    "UpdateMoney")   :: RemoteEvent,
-	UpdateIncome  = getOrCreate(folder, "RemoteEvent",    "UpdateIncome")  :: RemoteEvent,
-	UnlockItem    = getOrCreate(folder, "RemoteEvent",    "UnlockItem")    :: RemoteEvent,
+	ClaimTycoon = getOrCreate(folder, "RemoteEvent", "ClaimTycoon") :: RemoteEvent,
+	PurchaseItem = getOrCreate(folder, "RemoteEvent", "PurchaseItem") :: RemoteEvent,
+	UpdateMoney = getOrCreate(folder, "RemoteEvent", "UpdateMoney") :: RemoteEvent,
+	UpdateIncome = getOrCreate(folder, "RemoteEvent", "UpdateIncome") :: RemoteEvent,
+	UnlockItem = getOrCreate(folder, "RemoteEvent", "UnlockItem") :: RemoteEvent,
 	GetPlayerData = getOrCreate(folder, "RemoteFunction", "GetPlayerData") :: RemoteFunction,
 })
 

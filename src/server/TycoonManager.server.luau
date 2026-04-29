@@ -141,7 +141,15 @@ local function onPlayerAdded(player: Player)
 	fireUpdateMoney(player, state.balance)
 	Remotes.UpdateIncome:FireClient(player, state.incomePerSecond)
 
-	print(string.format("[TycoonManager] %s joined → pad %d | $%d | %d ips", player.Name, padNumber, state.balance, state.incomePerSecond))
+	print(
+		string.format(
+			"[TycoonManager] %s joined → pad %d | $%d | %d ips",
+			player.Name,
+			padNumber,
+			state.balance,
+			state.incomePerSecond
+		)
+	)
 end
 
 -- ── Player leave ──────────────────────────────────────────────────────────────
@@ -194,7 +202,14 @@ local function onPurchaseRequest(player: Player, itemName: string)
 	-- Validate: must be next in sequence (linear progression)
 	local nextItem = nextItemInSequence(state.unlockedItems)
 	if nextItem == nil or nextItem.modelName ~= itemName then
-		warn(string.format("[TycoonManager] %s tried to skip progression (wanted '%s', next is '%s')", player.Name, itemName, if nextItem then nextItem.modelName else "none"))
+		warn(
+			string.format(
+				"[TycoonManager] %s tried to skip progression (wanted '%s', next is '%s')",
+				player.Name,
+				itemName,
+				if nextItem then nextItem.modelName else "none"
+			)
+		)
 		return
 	end
 
@@ -228,7 +243,16 @@ local function onPurchaseRequest(player: Player, itemName: string)
 	Remotes.UpdateIncome:FireClient(player, state.incomePerSecond)
 	fireUpdateMoney(player, state.balance)
 
-	print(string.format("[TycoonManager] %s purchased '%s' for $%d | balance: $%d | ips: %d", player.Name, itemName, item.cost, state.balance, state.incomePerSecond))
+	print(
+		string.format(
+			"[TycoonManager] %s purchased '%s' for $%d | balance: $%d | ips: %d",
+			player.Name,
+			itemName,
+			item.cost,
+			state.balance,
+			state.incomePerSecond
+		)
+	)
 end
 
 -- ── Wire up events ────────────────────────────────────────────────────────────

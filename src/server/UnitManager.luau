@@ -158,8 +158,6 @@ local function spawnCFrameFor(center: CFrame, unitSpec: any, padNumber: number):
 	local spawnY: number
 	if category == "Aircraft" then
 		spawnY = height
-	elseif category == "Naval" then
-		spawnY = center.Position.Y -- water level
 	else
 		spawnY = center.Position.Y
 	end
