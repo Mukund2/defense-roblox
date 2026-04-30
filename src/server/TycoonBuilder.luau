@@ -165,11 +165,18 @@ local function spawnBuildingPart(folder: Folder, item: any, cf: CFrame)
 			local model = template:Clone()
 			model.Name = item.modelName
 
-			-- Anchor all parts and disable collision so players don't get trapped
+			-- Anchor all parts, disable collision, and remove broken scripts
 			for _, desc in model:GetDescendants() do
 				if desc:IsA("BasePart") then
 					desc.Anchored = true
 					desc.CanCollide = false
+				end
+			end
+			-- Strip internal scripts/PackageLinks from marketplace models
+			-- that cause require() errors at runtime
+			for _, desc in model:GetDescendants() do
+				if desc:IsA("BaseScript") or desc.ClassName == "PackageLink" then
+					desc:Destroy()
 				end
 			end
 

@@ -12,21 +12,15 @@ local LocalPlayer = Players.LocalPlayer
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes", 30) :: ModuleScript)
 
 -- ── Asset IDs ────────────────────────────────────────────────────────────────
+-- Using Roblox built-in / known-working asset IDs only.
 
-local MUSIC_ID = "rbxassetid://1837849285"
-local PURCHASE_SFX_ID = "rbxassetid://5153068437"
-local UNLOCK_SFX_ID = "rbxassetid://9125402735"
-local BEEP_SFX_ID = "rbxassetid://421058925"
+local PURCHASE_SFX_ID = "rbxassetid://7112275565" -- Cash Register (Kaching) from Creator Store
+local UNLOCK_SFX_ID = "rbxassetid://7112275565" -- Same kaching for unlock
+local BEEP_SFX_ID = "rbxassetid://6042053626" -- UI click/beep
 
--- ── Background Music ─────────────────────────────────────────────────────────
-
-local bgMusic = Instance.new("Sound")
-bgMusic.Name = "MilitaryBGM"
-bgMusic.SoundId = MUSIC_ID
-bgMusic.Volume = 0.3
-bgMusic.Looped = true
-bgMusic.Parent = SoundService
-bgMusic:Play()
+-- Background music disabled — no approved asset available.
+-- To enable: find a music ID on Creator Store, set it below.
+-- local MUSIC_ID = "rbxassetid://XXXXXXXXXX"
 
 -- ── SFX Sounds ───────────────────────────────────────────────────────────────
 -- Keep SFX as children of a folder under the SoundService for clean organisation.
@@ -92,8 +86,8 @@ local incomeTicks = 0
 
 Remotes.UpdateMoney.OnClientEvent:Connect(function(_amount: number)
 	incomeTicks += 1
-	if incomeTicks % 5 == 0 then
-		playSFX(purchaseSound)
+	if incomeTicks % 10 == 0 then
+		playSFX(beepSound)
 	end
 end)
 
