@@ -24,6 +24,8 @@ export type PlayerData = {
 	incomePerSecond: number,
 	unlockedItems: { string },
 	totalEarned: number,
+	lastDailyReward: number,
+	dailyStreak: number,
 }
 
 local DEFAULT_DATA: PlayerData = {
@@ -31,6 +33,8 @@ local DEFAULT_DATA: PlayerData = {
 	incomePerSecond = 5,
 	unlockedItems = { "CommandCenter" },
 	totalEarned = 0,
+	lastDailyReward = 0,
+	dailyStreak = 0,
 }
 
 local function deepCopy(original: { [string]: any }): { [string]: any }
@@ -78,6 +82,12 @@ function DataManager.LoadData(player: Player): PlayerData
 				if data.totalEarned ~= nil then
 					merged.totalEarned = data.totalEarned
 				end
+				if data.lastDailyReward ~= nil then
+					merged.lastDailyReward = data.lastDailyReward
+				end
+				if data.dailyStreak ~= nil then
+					merged.dailyStreak = data.dailyStreak
+				end
 				result = merged
 			end
 			break
@@ -112,6 +122,8 @@ function DataManager.SaveData(player: Player, data: PlayerData): boolean
 		incomePerSecond = data.incomePerSecond,
 		unlockedItems = table.clone(data.unlockedItems),
 		totalEarned = data.totalEarned,
+		lastDailyReward = data.lastDailyReward,
+		dailyStreak = data.dailyStreak,
 	}
 
 	if not dataStore then

@@ -10,6 +10,8 @@ local TycoonBuilder = require(script.Parent.TycoonBuilder) :: any
 local IncomeManager = require(script.Parent.IncomeManager) :: any
 local UnitManager = require(script.Parent.UnitManager) :: any
 local LeaderboardManager = require(script.Parent.LeaderboardManager) :: any
+local DailyRewardManager = require(script.Parent.DailyRewardManager) :: any
+local QuestManager = require(script.Parent.QuestManager) :: any
 
 -- ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -19,6 +21,8 @@ type TycoonState = {
 	incomePerSecond: number,
 	unlockedItems: { string },
 	lastSave: number,
+	lastDailyReward: number,
+	dailyStreak: number,
 }
 
 -- ── State ─────────────────────────────────────────────────────────────────────
@@ -69,6 +73,22 @@ local function fireUpdateMoney(player: Player, balance: number)
 	Remotes.UpdateMoney:FireClient(player, balance)
 end
 
+-- ── Cash helper (shared by daily rewards, quests, and income) ─────────────────
+
+local function addCash(player: Player, amount: number)
+	local state = tycoons[player]
+	if not state then
+		return
+	end
+	state.balance += amount
+	fireUpdateMoney(player, state.balance)
+	LeaderboardManager.UpdateCash(player, state.balance)
+end
+
+-- Wire the cash callback into DailyRewardManager and QuestManager.
+DailyRewardManager.SetAddCashCallback(addCash)
+QuestManager.SetAddCashCallback(addCash)
+
 -- ── Income tick callback ───────────────────────────────────────────────────────
 
 IncomeManager.SetTickCallback(function(player: Player, amount: number)
@@ -80,6 +100,9 @@ IncomeManager.SetTickCallback(function(player: Player, amount: number)
 	state.lastSave = state.lastSave -- keep reference (actual save is on leave)
 	fireUpdateMoney(player, state.balance)
 	LeaderboardManager.UpdateCash(player, state.balance)
+
+	-- Track quest progress for "earn" quests.
+	QuestManager.OnIncome(player, amount)
 end)
 
 -- ── Player join ───────────────────────────────────────────────────────────────
@@ -103,6 +126,8 @@ local function onPlayerAdded(player: Player)
 		incomePerSecond = data.incomePerSecond,
 		unlockedItems = data.unlockedItems,
 		lastSave = os.time(),
+		lastDailyReward = data.lastDailyReward or 0,
+		dailyStreak = data.dailyStreak or 0,
 	}
 	tycoons[player] = state
 
@@ -187,6 +212,15 @@ local function onPlayerAdded(player: Player)
 		end
 	end)
 
+	-- Daily rewards: check if player can claim
+	DailyRewardManager.CheckAndShowReward(player, data)
+
+	-- Daily quests: generate or restore quests for today
+	QuestManager.Setup(player)
+
+	-- Set initial quest level progress based on already unlocked items
+	QuestManager.OnLevelChange(player, #state.unlockedItems)
+
 	print(
 		string.format(
 			"[TycoonManager] %s joined → pad %d | $%d | %d ips",
@@ -209,18 +243,27 @@ local function onPlayerRemoving(player: Player)
 	-- Stop the income loop first so no more ticks fire
 	IncomeManager.StopIncome(player)
 
+	-- Pull latest daily reward data before saving.
+	local lastDR, drStreak = DailyRewardManager.GetData(player)
+
 	-- Persist data
 	DataManager.SaveData(player, {
 		balance = state.balance,
 		incomePerSecond = state.incomePerSecond,
 		unlockedItems = state.unlockedItems,
 		totalEarned = 0, -- totalEarned tracked separately if needed
+		lastDailyReward = lastDR,
+		dailyStreak = drStreak,
 	})
 
 	-- Unregister from combat
 	if _G.CombatAPI then
 		_G.CombatAPI.UnregisterBase(player)
 	end
+
+	-- Clean up daily reward and quest state
+	DailyRewardManager.OnPlayerRemoving(player)
+	QuestManager.OnPlayerRemoving(player)
 
 	-- Clean up units and the world
 	UnitManager.DespawnAllUnits(state.pad)
@@ -299,6 +342,10 @@ local function onPurchaseRequest(player: Player, itemName: string)
 		_G.CombatAPI.OnBuildingUnlocked(player, state.unlockedItems)
 	end
 
+	-- Track quest progress for "buy" and "level" quests.
+	QuestManager.OnPurchase(player)
+	QuestManager.OnLevelChange(player, #state.unlockedItems)
+
 	-- Notify client
 	Remotes.UnlockItem:FireClient(player, item.name, item.description)
 	Remotes.UpdateIncome:FireClient(player, state.incomePerSecond)
@@ -364,6 +411,14 @@ Players.PlayerAdded:Connect(onPlayerAdded)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
 Remotes.PurchaseItem.OnServerEvent:Connect(onPurchaseRequest)
+Remotes.ClaimDailyReward.OnServerEvent:Connect(function(player: Player)
+	DailyRewardManager.ClaimReward(player)
+end)
+Remotes.ClaimQuestReward.OnServerEvent:Connect(function(player: Player, questIndex: unknown)
+	if type(questIndex) == "number" then
+		QuestManager.ClaimReward(player, questIndex)
+	end
+end)
 
 -- Handle players who joined before this script loaded (Studio play-solo edge case)
 for _, player in Players:GetPlayers() do

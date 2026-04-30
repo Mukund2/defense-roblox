@@ -52,6 +52,22 @@ export type RemotesType = {
 	AttackResult: RemoteEvent, -- Tells the attacker the result of their attack.
 	--   args: success: boolean, message: string
 
+	-- Daily Rewards
+	ShowDailyReward: RemoteEvent, -- Server tells client to show daily reward calendar.
+	--   args: streakDay: number, rewardAmount: number, canClaim: boolean
+	ClaimDailyReward: RemoteEvent, -- Client requests to claim today's daily reward.
+	--   args: (none)
+	DailyRewardClaimed: RemoteEvent, -- Server confirms daily reward was claimed.
+	--   args: amount: number
+
+	-- Daily Quests
+	UpdateQuests: RemoteEvent, -- Server sends quest list with progress to client.
+	--   args: quests: { { questType: string, description: string, target: number, progress: number, reward: number, claimed: boolean } }
+	ClaimQuestReward: RemoteEvent, -- Client requests to claim a completed quest reward.
+	--   args: questIndex: number
+	QuestCompleted: RemoteEvent, -- Server confirms quest reward was claimed.
+	--   args: questIndex: number, reward: number
+
 	-- Client → Server (with response)
 	GetPlayerData: RemoteFunction, -- Client requests its full save data snapshot.
 	--   returns: { money: number, income: number, unlockedItems: {string} }
@@ -121,6 +137,14 @@ local Remotes: RemotesType = table.freeze({
 	AttackLaunched = getOrCreate(folder, "RemoteEvent", "AttackLaunched") :: RemoteEvent,
 	UpdateShield = getOrCreate(folder, "RemoteEvent", "UpdateShield") :: RemoteEvent,
 	AttackResult = getOrCreate(folder, "RemoteEvent", "AttackResult") :: RemoteEvent,
+	-- Daily Rewards
+	ShowDailyReward = getOrCreate(folder, "RemoteEvent", "ShowDailyReward") :: RemoteEvent,
+	ClaimDailyReward = getOrCreate(folder, "RemoteEvent", "ClaimDailyReward") :: RemoteEvent,
+	DailyRewardClaimed = getOrCreate(folder, "RemoteEvent", "DailyRewardClaimed") :: RemoteEvent,
+	-- Daily Quests
+	UpdateQuests = getOrCreate(folder, "RemoteEvent", "UpdateQuests") :: RemoteEvent,
+	ClaimQuestReward = getOrCreate(folder, "RemoteEvent", "ClaimQuestReward") :: RemoteEvent,
+	QuestCompleted = getOrCreate(folder, "RemoteEvent", "QuestCompleted") :: RemoteEvent,
 })
 
 return Remotes

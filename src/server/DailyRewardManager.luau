@@ -123,6 +123,15 @@ function DailyRewardManager.ClaimReward(player: Player)
 	print(string.format("[DailyRewardManager] %s claimed day %d reward: $%d", player.Name, newStreak, reward))
 end
 
+--- Returns the current daily reward data for save purposes.
+function DailyRewardManager.GetData(player: Player): (number, number)
+	local entry = cache[player]
+	if entry then
+		return entry.lastClaim, entry.streak
+	end
+	return 0, 0
+end
+
 --- Cleanup on player leave.
 function DailyRewardManager.OnPlayerRemoving(player: Player)
 	cache[player] = nil
