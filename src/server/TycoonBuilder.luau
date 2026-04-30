@@ -14,14 +14,14 @@ type TycoonItemCategory = "Building" | "Vehicle" | "Aircraft" | "Naval" | "Strat
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
 
-local PAD_SPACING = 300 -- studs between pad origins in the X axis
+local PAD_SPACING = 150 -- studs between pad origins in the X axis
 local PAD_BASE_POSITION = Vector3.new(0, 0, 0) -- first pad anchor
 
 -- Grid layout for spawned buildings relative to a pad origin.
 -- Items are placed in rows of GRID_COLS, each cell is CELL_SIZE studs wide.
 local GRID_COLS = 3
-local CELL_SIZE = 55 -- studs per cell
-local CELL_DEPTH = 55 -- studs deep per row
+local CELL_SIZE = 40 -- studs per cell (fits within 150 stud pad spacing)
+local CELL_DEPTH = 40 -- studs deep per row
 
 -- Category colour palette (BrickColor names)
 local CATEGORY_COLOR: { [TycoonItemCategory]: BrickColor } = {
@@ -165,10 +165,11 @@ local function spawnBuildingPart(folder: Folder, item: any, cf: CFrame)
 			local model = template:Clone()
 			model.Name = item.modelName
 
-			-- Anchor all parts
+			-- Anchor all parts and disable collision so players don't get trapped
 			for _, desc in model:GetDescendants() do
 				if desc:IsA("BasePart") then
 					desc.Anchored = true
+					desc.CanCollide = false
 				end
 			end
 
@@ -356,9 +357,9 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
 	local folder = getOrCreatePadFolder(padNumber)
 	local origin = padOriginCFrame(padNumber)
 
-	local platWidth = 250
-	local platDepth = 400
-	local platCenterZ = 150
+	local platWidth = 130
+	local platDepth = 250
+	local platCenterZ = 100
 
 	-- ── Phase 1B: Terrain & Environment ─────────────────────────────────────
 
@@ -367,8 +368,8 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
 	grass.Name = "GrassPlatform"
 	grass.Anchored = true
 	grass.Size = Vector3.new(platWidth + 40, 3, platDepth + 40)
-	grass.BrickColor = BrickColor.new("Sand green")
-	grass.Material = Enum.Material.Grass
+	grass.BrickColor = BrickColor.new("Bright green")
+	grass.Material = Enum.Material.LeafyGrass
 	grass.CFrame = origin + Vector3.new(0, -2.5, platCenterZ)
 	grass.Parent = folder
 
@@ -377,7 +378,7 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
 	base.Name = "BasePlatform"
 	base.Anchored = true
 	base.Size = Vector3.new(platWidth, 2, platDepth)
-	base.BrickColor = BrickColor.new("Dark stone grey")
+	base.BrickColor = BrickColor.new("Medium stone grey")
 	base.Material = Enum.Material.Concrete
 	base.CFrame = origin + Vector3.new(0, -1, platCenterZ)
 	base.Parent = folder
@@ -397,7 +398,7 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
 	local runway = Instance.new("Part")
 	runway.Name = "Runway"
 	runway.Anchored = true
-	runway.Size = Vector3.new(200, 1, 20)
+	runway.Size = Vector3.new(platWidth - 10, 1, 16)
 	runway.BrickColor = BrickColor.new("Really black")
 	runway.Material = Enum.Material.SmoothPlastic
 	runway.CFrame = origin + Vector3.new(0, 0.01, -15)
@@ -451,12 +452,12 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
 
 	-- ── Decorative trees (on the grass border area) ─────────────────────────
 	local treePositions = {
-		Vector3.new(-platWidth / 2 - 10, 0, 30),
-		Vector3.new(platWidth / 2 + 10, 0, 30),
-		Vector3.new(-platWidth / 2 - 10, 0, 150),
-		Vector3.new(platWidth / 2 + 10, 0, 150),
-		Vector3.new(-platWidth / 2 - 10, 0, 280),
-		Vector3.new(platWidth / 2 + 10, 0, 310),
+		Vector3.new(-platWidth / 2 - 10, 0, platCenterZ - platDepth / 3),
+		Vector3.new(platWidth / 2 + 10, 0, platCenterZ - platDepth / 3),
+		Vector3.new(-platWidth / 2 - 10, 0, platCenterZ),
+		Vector3.new(platWidth / 2 + 10, 0, platCenterZ),
+		Vector3.new(-platWidth / 2 - 10, 0, platCenterZ + platDepth / 3),
+		Vector3.new(platWidth / 2 + 10, 0, platCenterZ + platDepth / 3),
 	}
 	for t, treeOff in treePositions do
 		-- Brown trunk

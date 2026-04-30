@@ -15,7 +15,7 @@ local Camera = Workspace.CurrentCamera
 
 -- ── Constants ────────────────────────────────────────────────────────────────
 
-local PAD_SPACING = 300
+local PAD_SPACING = 150
 local EXPLOSION_COLORS = {
 	Color3.fromRGB(255, 120, 30), -- orange
 	Color3.fromRGB(255, 60, 20), -- red-orange

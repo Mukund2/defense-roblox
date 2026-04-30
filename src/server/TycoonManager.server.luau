@@ -116,7 +116,7 @@ local function onPlayerAdded(player: Player)
 	TycoonBuilder.SetupTycoonPad(padNumber, player)
 
 	-- Teleport the player to their pad once it's built
-	local PAD_SPACING = 300
+	local PAD_SPACING = 150
 	local spawnCF = CFrame.new(Vector3.new((padNumber - 1) * PAD_SPACING, 5, 10))
 	local character = player.Character or player.CharacterAdded:Wait()
 	local rootPart = character:WaitForChild("HumanoidRootPart", 10) :: BasePart?
@@ -149,7 +149,7 @@ local function onPlayerAdded(player: Player)
 	end
 
 	-- Register the pad with UnitManager so it knows the world-space center.
-	local padCenter = CFrame.new(Vector3.new((padNumber - 1) * PAD_SPACING, 0, 0))
+	local padCenter = CFrame.new(Vector3.new((padNumber - 1) * 150, 0, 0))
 	UnitManager.RegisterPad(padNumber, player, padCenter)
 
 	-- Re-spawn all previously unlocked buildings (skip CommandCenter — already placed by SetupTycoonPad)
