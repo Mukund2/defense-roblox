@@ -28,17 +28,15 @@ export type FormatNumberType = {
 
 -- Inserts thousands-separator commas into an integer string.
 local function addCommas(intStr: string): string
-	-- Walk backwards through the string, inserting a comma every 3 digits.
-	local result = {}
-	local len = #intStr
-	for i = 1, len do
-		local fromRight = len - i -- 0-indexed distance from the right
-		if fromRight > 0 and fromRight % 3 == 0 then
-			table.insert(result, ",")
-		end
-		table.insert(result, intStr:sub(i, i))
+	-- Reverse, insert comma after every 3 digits, reverse back, strip leading comma.
+	local reversed = intStr:reverse()
+	local withCommas = reversed:gsub("(%d%d%d)", "%1,")
+	local result = withCommas:reverse()
+	-- Strip leading comma that appears when length is a multiple of 3
+	if result:sub(1, 1) == "," then
+		result = result:sub(2)
 	end
-	return table.concat(result)
+	return result
 end
 
 -- Formats a non-negative integer with commas.  Handles the integer portion

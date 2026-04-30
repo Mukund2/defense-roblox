@@ -57,8 +57,10 @@ local function getOrCreate(parent: Instance, className: string, name: string): I
 		return instance
 	else
 		-- Client: wait for the server to create the remote
-		local existing = parent:WaitForChild(name, 10)
-		assert(existing, `Remote "{name}" not found on the client after 10s — make sure the server has initialised Remotes first.`)
+		local existing = parent:WaitForChild(name, 30)
+		if not existing then
+			error(`Remote "{name}" not found on the client after 30s — make sure the server has initialised Remotes first.`)
+		end
 		return existing
 	end
 end
@@ -78,9 +80,13 @@ if IS_SERVER then
 		folder.Parent = ReplicatedStorage
 	end
 else
-	-- Block until the server has created the folder (handles race conditions).
-	folder = ReplicatedStorage:WaitForChild(FOLDER_NAME, 10) :: Folder
-	assert(folder, FOLDER_NAME .. " folder not found in ReplicatedStorage after 10 seconds.")
+	-- Block until the server has created the folder.
+	-- Use a generous timeout to handle Studio play-solo race conditions where
+	-- the server scripts may still be loading DataManager / DataStore.
+	folder = ReplicatedStorage:WaitForChild(FOLDER_NAME, 30) :: Folder
+	if not folder then
+		error(FOLDER_NAME .. " folder not found in ReplicatedStorage after 30s — server scripts may have failed to load.")
+	end
 end
 
 -- ── Remote construction ───────────────────────────────────────────────────

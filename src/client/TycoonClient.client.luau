@@ -31,6 +31,10 @@ local HUD: {
 } | nil =
 	nil
 
+-- Cache values received before HUD is ready so they aren't lost.
+local pendingMoney: number? = nil
+local pendingIncome: number? = nil
+
 task.spawn(function()
 	-- Wait up to 10 s for the HUD module to register itself.
 	local deadline = os.clock() + 10
@@ -38,6 +42,13 @@ task.spawn(function()
 		local api = _G.TycoonHUD :: any
 		if api then
 			HUD = api
+			-- Flush any values that arrived before the HUD was ready.
+			if pendingMoney then
+				HUD.UpdateMoney(pendingMoney)
+			end
+			if pendingIncome then
+				HUD.UpdateIncome(pendingIncome)
+			end
 			break
 		end
 		task.wait(0.1)
@@ -166,17 +177,34 @@ LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 -- ── Remote listeners ─────────────────────────────────────────────────────────
 
 -- Tracks the running base level so we can pass it to UpdateBaseLevel.
-local currentBaseLevel = 0
+-- Start at 1 because CommandCenter is always unlocked by default.
+local currentBaseLevel = 1
+
+-- Set initial base level once HUD is ready.
+task.spawn(function()
+	local deadline = os.clock() + 12
+	while os.clock() < deadline do
+		if HUD then
+			HUD.UpdateBaseLevel(currentBaseLevel)
+			break
+		end
+		task.wait(0.2)
+	end
+end)
 
 UpdateMoney.OnClientEvent:Connect(function(amount: number)
 	if HUD then
 		HUD.UpdateMoney(amount)
+	else
+		pendingMoney = amount
 	end
 end)
 
 UpdateIncome.OnClientEvent:Connect(function(rate: number)
 	if HUD then
 		HUD.UpdateIncome(rate)
+	else
+		pendingIncome = rate
 	end
 end)
 
