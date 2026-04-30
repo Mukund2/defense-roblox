@@ -179,19 +179,30 @@ LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
 -- ── Remote listeners ─────────────────────────────────────────────────────────
 
 -- Tracks the running base level so we can pass it to UpdateBaseLevel.
--- Start at 1 because CommandCenter is always unlocked by default.
 local currentBaseLevel = 1
 
--- Set initial base level once HUD is ready.
+-- Fetch initial state from server and sync base level with HUD.
 task.spawn(function()
+	-- Wait for HUD to be ready
 	local deadline = os.clock() + 12
 	while os.clock() < deadline do
 		if HUD then
-			HUD.UpdateBaseLevel(currentBaseLevel)
 			break
 		end
 		task.wait(0.2)
 	end
+	if not HUD then
+		return
+	end
+
+	-- Query server for actual unlocked items count
+	local ok, data = pcall(function()
+		return Remotes.GetPlayerData:InvokeServer()
+	end)
+	if ok and data and data.unlockedItems then
+		currentBaseLevel = #data.unlockedItems
+	end
+	HUD.UpdateBaseLevel(currentBaseLevel)
 end)
 
 UpdateMoney.OnClientEvent:Connect(function(amount: number)

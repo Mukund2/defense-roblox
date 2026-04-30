@@ -344,6 +344,20 @@ _G.CombatRewardFunds = function(player: Player, amount: number)
 	LeaderboardManager.UpdateCash(player, state.balance)
 end
 
+-- ── GetPlayerData handler ─────────────────────────────────────────────────────
+
+Remotes.GetPlayerData.OnServerInvoke = function(player: Player)
+	local state = tycoons[player]
+	if not state then
+		return { money = 0, income = 0, unlockedItems = { "CommandCenter" } }
+	end
+	return {
+		money = state.balance,
+		income = state.incomePerSecond,
+		unlockedItems = table.clone(state.unlockedItems),
+	}
+end
+
 -- ── Wire up events ────────────────────────────────────────────────────────────
 
 Players.PlayerAdded:Connect(onPlayerAdded)
