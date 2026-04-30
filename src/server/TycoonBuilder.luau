@@ -172,31 +172,53 @@ local function spawnBuildingPart(folder: Folder, item: any, cf: CFrame)
 				end
 			end
 
-			-- Position the model
+			-- Position the model so its BOTTOM sits at ground level (cf.Y).
+			-- Marketplace models have arbitrary positions and no PrimaryPart.
+			-- Strategy: PivotTo target first, then measure bottom and shift up.
 			if model:IsA("Model") then
-				if model.PrimaryPart then
-					model:PivotTo(cf + Vector3.new(0, 0, 0))
-				else
-					-- Set PrimaryPart to first BasePart found
+				-- Ensure a PrimaryPart exists for PivotTo
+				if not model.PrimaryPart then
 					for _, desc in model:GetDescendants() do
 						if desc:IsA("BasePart") then
 							model.PrimaryPart = desc
 							break
 						end
 					end
-					if model.PrimaryPart then
-						model:PivotTo(cf + Vector3.new(0, 0, 0))
+				end
+
+				if model.PrimaryPart then
+					-- Step 1: Pivot model so PrimaryPart is at the target CFrame
+					model:PivotTo(cf)
+
+					-- Step 2: Find how far below cf.Y the bottom extends
+					local minY = math.huge
+					for _, desc in model:GetDescendants() do
+						if desc:IsA("BasePart") then
+							local partBottom = desc.Position.Y - desc.Size.Y / 2
+							if partBottom < minY then
+								minY = partBottom
+							end
+						end
+					end
+
+					-- Step 3: Shift the entire model up so bottom sits at ground (cf.Y)
+					local shiftUp = cf.Position.Y - minY
+					if math.abs(shiftUp) > 0.1 then
+						model:PivotTo(model:GetPivot() + Vector3.new(0, shiftUp, 0))
 					end
 				end
 			elseif model:IsA("BasePart") then
 				model.CFrame = cf + Vector3.new(0, model.Size.Y / 2, 0)
 			end
 
-			-- Name tag above the model
+			-- Name tag above the model — offset based on actual model height
+			local _, placedSize = model:GetBoundingBox()
+			local tagHeight = placedSize.Y + 3
+
 			local nameGui = Instance.new("BillboardGui")
 			nameGui.Name = "NameGui"
 			nameGui.Size = UDim2.new(0, 200, 0, 40)
-			nameGui.StudsOffset = Vector3.new(0, 15, 0)
+			nameGui.StudsOffset = Vector3.new(0, tagHeight, 0)
 			nameGui.AlwaysOnTop = false
 			if model:IsA("Model") and model.PrimaryPart then
 				nameGui.Adornee = model.PrimaryPart
