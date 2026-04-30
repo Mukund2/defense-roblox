@@ -165,6 +165,24 @@ local function spawnBuildingPart(folder: Folder, item: any, cf: CFrame)
 			local model = template:Clone()
 			model.Name = item.modelName
 
+			-- If the model is just a wrapper around a single child Model,
+			-- unwrap it so we place the actual content correctly.
+			local children = model:GetChildren()
+			local childModels = {}
+			for _, child in children do
+				if child:IsA("Model") then
+					table.insert(childModels, child)
+				end
+			end
+			if #childModels == 1 and #children <= 2 then
+				-- Unwrap: use the inner model instead
+				local inner = childModels[1]
+				inner.Name = model.Name
+				inner.Parent = model.Parent
+				model:Destroy()
+				model = inner
+			end
+
 			-- Anchor all parts, disable collision, and remove broken scripts
 			for _, desc in model:GetDescendants() do
 				if desc:IsA("BasePart") then
@@ -182,7 +200,7 @@ local function spawnBuildingPart(folder: Folder, item: any, cf: CFrame)
 
 			-- Position the model so its BOTTOM sits at ground level (cf.Y).
 			-- Marketplace models have arbitrary positions and no PrimaryPart.
-			-- Strategy: PivotTo target first, then measure bottom and shift up.
+			-- Strategy: PivotTo target first, measure bottom, shift up, then scale if too big.
 			if model:IsA("Model") then
 				-- Ensure a PrimaryPart exists for PivotTo
 				if not model.PrimaryPart then
@@ -198,14 +216,15 @@ local function spawnBuildingPart(folder: Folder, item: any, cf: CFrame)
 					-- Step 1: Pivot model so PrimaryPart is at the target CFrame
 					model:PivotTo(cf)
 
-					-- Step 2: Find how far below cf.Y the bottom extends
+					-- Step 2: Find actual bounds after placement
 					local minY = math.huge
+					local maxY = -math.huge
 					for _, desc in model:GetDescendants() do
 						if desc:IsA("BasePart") then
 							local partBottom = desc.Position.Y - desc.Size.Y / 2
-							if partBottom < minY then
-								minY = partBottom
-							end
+							local partTop = desc.Position.Y + desc.Size.Y / 2
+							if partBottom < minY then minY = partBottom end
+							if partTop > maxY then maxY = partTop end
 						end
 					end
 
@@ -214,39 +233,56 @@ local function spawnBuildingPart(folder: Folder, item: any, cf: CFrame)
 					if math.abs(shiftUp) > 0.1 then
 						model:PivotTo(model:GetPivot() + Vector3.new(0, shiftUp, 0))
 					end
+
+					-- Step 4: If model is unreasonably large, discard and use placeholder
+					local actualHeight = maxY - minY
+					local _, finalSize = model:GetBoundingBox()
+					local maxDim = math.max(finalSize.X, finalSize.Y, finalSize.Z)
+					if actualHeight > 40 or maxDim > 70 then
+						warn(string.format(
+							"[TycoonBuilder] Model '%s' too large (%.0fx%.0fx%.0f, h=%.0f) — using placeholder",
+							item.modelName, finalSize.X, finalSize.Y, finalSize.Z, actualHeight
+						))
+						model:Destroy()
+						model = nil :: any
+					end
 				end
 			elseif model:IsA("BasePart") then
 				model.CFrame = cf + Vector3.new(0, model.Size.Y / 2, 0)
 			end
 
-			-- Name tag above the model — offset based on actual model height
-			local _, placedSize = model:GetBoundingBox()
-			local tagHeight = placedSize.Y + 3
+			-- If model was discarded as too large, fall through to placeholder below
+			if model ~= nil then
+				-- Name tag above the model — offset based on actual model height
+				local _, placedSize = model:GetBoundingBox()
+				local tagHeight = placedSize.Y + 3
 
-			local nameGui = Instance.new("BillboardGui")
-			nameGui.Name = "NameGui"
-			nameGui.Size = UDim2.new(0, 200, 0, 40)
-			nameGui.StudsOffset = Vector3.new(0, tagHeight, 0)
-			nameGui.AlwaysOnTop = false
-			if model:IsA("Model") and model.PrimaryPart then
-				nameGui.Adornee = model.PrimaryPart
-				nameGui.Parent = model.PrimaryPart
-			else
-				nameGui.Parent = model
+				local nameGui = Instance.new("BillboardGui")
+				nameGui.Name = "NameGui"
+				nameGui.Size = UDim2.new(0, 200, 0, 40)
+				nameGui.StudsOffset = Vector3.new(0, tagHeight, 0)
+				nameGui.AlwaysOnTop = false
+				if model:IsA("Model") and model.PrimaryPart then
+					nameGui.Adornee = model.PrimaryPart
+					nameGui.Parent = model.PrimaryPart
+				else
+					nameGui.Parent = model
+				end
+
+				local nameLabel = Instance.new("TextLabel")
+				nameLabel.Size = UDim2.new(1, 0, 1, 0)
+				nameLabel.BackgroundTransparency = 1
+				nameLabel.TextColor3 = Color3.new(1, 1, 1)
+				nameLabel.TextScaled = true
+				nameLabel.Font = Enum.Font.GothamBold
+				nameLabel.Text = item.name
+				nameLabel.TextStrokeTransparency = 0.5
+				nameLabel.Parent = nameGui
+
+				model.Parent = folder
+				return model
 			end
-
-			local nameLabel = Instance.new("TextLabel")
-			nameLabel.Size = UDim2.new(1, 0, 1, 0)
-			nameLabel.BackgroundTransparency = 1
-			nameLabel.TextColor3 = Color3.new(1, 1, 1)
-			nameLabel.TextScaled = true
-			nameLabel.Font = Enum.Font.GothamBold
-			nameLabel.Text = item.name
-			nameLabel.TextStrokeTransparency = 0.5
-			nameLabel.Parent = nameGui
-
-			model.Parent = folder
-			return model
+			-- model was nil (too large) — fall through to placeholder
 		end
 	end
 
