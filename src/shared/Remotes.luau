@@ -46,33 +46,41 @@ export type RemotesType = {
 -- ── Helpers ────────────────────────────────────────────────────────────────
 
 local function getOrCreate(parent: Instance, className: string, name: string): Instance
-	local existing = parent:FindFirstChild(name)
-	if existing then
+	if IS_SERVER then
+		local existing = parent:FindFirstChild(name)
+		if existing then
+			return existing
+		end
+		local instance = Instance.new(className)
+		instance.Name = name
+		instance.Parent = parent
+		return instance
+	else
+		-- Client: wait for the server to create the remote
+		local existing = parent:WaitForChild(name, 10)
+		assert(existing, `Remote "{name}" not found on the client after 10s — make sure the server has initialised Remotes first.`)
 		return existing
 	end
-	assert(IS_SERVER, `Remote "{name}" not found on the client — make sure the server has initialised Remotes first.`)
-	local instance = Instance.new(className)
-	instance.Name = name
-	instance.Parent = parent
-	return instance
 end
 
 -- ── Folder ────────────────────────────────────────────────────────────────
 
+local FOLDER_NAME = "RemoteEvents"
+
 local folder: Folder
 if IS_SERVER then
-	local existing = ReplicatedStorage:FindFirstChild("Remotes")
+	local existing = ReplicatedStorage:FindFirstChild(FOLDER_NAME)
 	if existing and existing:IsA("Folder") then
 		folder = existing
 	else
 		folder = Instance.new("Folder")
-		folder.Name = "Remotes"
+		folder.Name = FOLDER_NAME
 		folder.Parent = ReplicatedStorage
 	end
 else
 	-- Block until the server has created the folder (handles race conditions).
-	folder = ReplicatedStorage:WaitForChild("Remotes", 10) :: Folder
-	assert(folder, "Remotes folder not found in ReplicatedStorage after 10 seconds.")
+	folder = ReplicatedStorage:WaitForChild(FOLDER_NAME, 10) :: Folder
+	assert(folder, FOLDER_NAME .. " folder not found in ReplicatedStorage after 10 seconds.")
 end
 
 -- ── Remote construction ───────────────────────────────────────────────────

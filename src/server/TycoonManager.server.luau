@@ -107,9 +107,40 @@ local function onPlayerAdded(player: Player)
 	-- Build the tycoon in the world
 	TycoonBuilder.SetupTycoonPad(padNumber, player)
 
-	-- Register the pad with UnitManager so it knows the world-space center.
-	-- Pad centers are spaced PAD_SPACING studs apart along X (matches TycoonBuilder).
+	-- Teleport the player to their pad once it's built
 	local PAD_SPACING = 300
+	local spawnCF = CFrame.new(Vector3.new((padNumber - 1) * PAD_SPACING, 5, 10))
+	local character = player.Character or player.CharacterAdded:Wait()
+	local rootPart = character:WaitForChild("HumanoidRootPart", 10) :: BasePart?
+	if rootPart then
+		rootPart.CFrame = spawnCF
+	end
+
+	-- Respawn player on their pad if they fall below the map
+	local function onCharacterAdded(newCharacter: Model)
+		local hrp = newCharacter:WaitForChild("HumanoidRootPart", 10) :: BasePart?
+		if hrp then
+			hrp.CFrame = spawnCF
+		end
+		local humanoid = newCharacter:WaitForChild("Humanoid", 10) :: Humanoid?
+		if humanoid then
+			task.spawn(function()
+				while humanoid and humanoid.Health > 0 do
+					if hrp and hrp.Position.Y < -50 then
+						hrp.CFrame = spawnCF
+						hrp.AssemblyLinearVelocity = Vector3.zero
+					end
+					task.wait(0.5)
+				end
+			end)
+		end
+	end
+	player.CharacterAdded:Connect(onCharacterAdded)
+	if player.Character then
+		onCharacterAdded(player.Character)
+	end
+
+	-- Register the pad with UnitManager so it knows the world-space center.
 	local padCenter = CFrame.new(Vector3.new((padNumber - 1) * PAD_SPACING, 0, 0))
 	UnitManager.RegisterPad(padNumber, player, padCenter)
 

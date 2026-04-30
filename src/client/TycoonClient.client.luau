@@ -14,7 +14,6 @@ local LocalPlayer = Players.LocalPlayer
 -- has created all remotes so no extra WaitForChild calls are needed here.
 local Remotes = require(ReplicatedStorage:WaitForChild("Remotes", 30) :: ModuleScript)
 
-local ClaimTycoon = Remotes.ClaimTycoon
 local UpdateMoney = Remotes.UpdateMoney
 local UpdateIncome = Remotes.UpdateIncome
 local UnlockItem = Remotes.UnlockItem
@@ -126,9 +125,6 @@ end
 local function onCharacterAdded(character: Model)
 	-- Wait for humanoid so the character is fully loaded.
 	character:WaitForChild("HumanoidRootPart", 10)
-
-	-- Claim a tycoon pad.
-	ClaimTycoon:FireServer()
 
 	-- Connect purchase button detection.
 	-- Purchase buttons live inside Tycoon_Pad_N folders in workspace.

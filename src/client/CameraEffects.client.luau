@@ -17,31 +17,19 @@ local OVERVIEW_OFFSET = 160 -- horizontal offset so we look across the base
 -- ── Helpers ───────────────────────────────────────────────────────────────────
 
 -- Attempt to locate this player's tycoon pad in workspace.
--- The server names tycoon pads as "TycoonPad_<UserId>" or groups them under
--- a folder named "Tycoons". We try both conventions and fall back gracefully.
+-- The server names tycoon folders as "Tycoon_Pad_N" (1-indexed pad number).
+-- We scan for any folder matching that prefix and look for BasePlatform inside.
 local function findTycoonPadCFrame(): CFrame
-	-- Try folder first.
-	local tycoonsFolder = workspace:FindFirstChild("Tycoons")
-	if tycoonsFolder then
-		local pad = tycoonsFolder:FindFirstChild("TycoonPad_" .. LocalPlayer.UserId)
-			or tycoonsFolder:FindFirstChildOfClass("Model")
-			or tycoonsFolder:FindFirstChildOfClass("Part")
-		if pad then
-			if pad:IsA("BasePart") then
-				return pad.CFrame
-			elseif pad:IsA("Model") and pad.PrimaryPart then
-				return pad.PrimaryPart.CFrame
-			end
-		end
-	end
+	-- Wait briefly for tycoon folders to appear (server may still be building)
+	task.wait(0.5)
 
-	-- Fall back: look for a direct workspace child.
-	local directPad = workspace:FindFirstChild("TycoonPad_" .. LocalPlayer.UserId)
-	if directPad then
-		if directPad:IsA("BasePart") then
-			return directPad.CFrame
-		elseif directPad:IsA("Model") and (directPad :: Model).PrimaryPart then
-			return (directPad :: Model).PrimaryPart.CFrame
+	-- Scan workspace for Tycoon_Pad_N folders and find BasePlatform inside
+	for _, child in workspace:GetChildren() do
+		if child:IsA("Folder") and child.Name:sub(1, 11) == "Tycoon_Pad_" then
+			local basePlatform = child:FindFirstChild("BasePlatform")
+			if basePlatform and basePlatform:IsA("BasePart") then
+				return basePlatform.CFrame
+			end
 		end
 	end
 

@@ -1,12 +1,23 @@
 --!strict
 
 local DataStoreService = game:GetService("DataStoreService")
+local RunService = game:GetService("RunService")
 
 local DATASTORE_NAME = "MilitaryBaseTycoon_v1"
 local MAX_RETRIES = 3
 local RETRY_DELAY = 1
 
-local dataStore = DataStoreService:GetDataStore(DATASTORE_NAME)
+-- DataStore is unavailable in unpublished places and Studio without API access.
+-- Gracefully fall back to in-memory-only storage so the game still runs.
+local dataStore: DataStore? = nil
+local ok, result = pcall(function()
+	return DataStoreService:GetDataStore(DATASTORE_NAME)
+end)
+if ok then
+	dataStore = result
+else
+	warn("[DataManager] DataStore unavailable (unpublished place?). Using in-memory fallback.")
+end
 
 export type PlayerData = {
 	balance: number,
@@ -41,9 +52,13 @@ function DataManager.LoadData(player: Player): PlayerData
 	local result: PlayerData? = nil
 	local success = false
 
+	if not dataStore then
+		return deepCopy(DEFAULT_DATA) :: PlayerData
+	end
+
 	for attempt = 1, MAX_RETRIES do
 		local ok, data = pcall(function()
-			return dataStore:GetAsync(key)
+			return (dataStore :: DataStore):GetAsync(key)
 		end)
 
 		if ok then
@@ -99,9 +114,13 @@ function DataManager.SaveData(player: Player, data: PlayerData): boolean
 		totalEarned = data.totalEarned,
 	}
 
+	if not dataStore then
+		return true -- silently succeed; data only lives in memory this session
+	end
+
 	for attempt = 1, MAX_RETRIES do
 		local ok, err = pcall(function()
-			dataStore:UpdateAsync(key, function(_oldData: any)
+			(dataStore :: DataStore):UpdateAsync(key, function(_oldData: any)
 				return snapshot
 			end)
 		end)

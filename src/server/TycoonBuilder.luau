@@ -1,8 +1,12 @@
 --!strict
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerStorage = game:GetService("ServerStorage")
 
 local TycoonConfig = require(ReplicatedStorage.TycoonConfig) :: any
+
+-- Folder containing real models inserted from the Roblox catalog
+local TycoonModels = ServerStorage:FindFirstChild("TycoonModels")
 
 -- ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -15,9 +19,9 @@ local PAD_BASE_POSITION = Vector3.new(0, 0, 0) -- first pad anchor
 
 -- Grid layout for spawned buildings relative to a pad origin.
 -- Items are placed in rows of GRID_COLS, each cell is CELL_SIZE studs wide.
-local GRID_COLS = 4
-local CELL_SIZE = 24 -- studs per cell
-local CELL_DEPTH = 20 -- studs deep per row
+local GRID_COLS = 3
+local CELL_SIZE = 55 -- studs per cell
+local CELL_DEPTH = 55 -- studs deep per row
 
 -- Category colour palette (BrickColor names)
 local CATEGORY_COLOR: { [TycoonItemCategory]: BrickColor } = {
@@ -127,12 +131,75 @@ local function createButtonGui(parent: Part, itemName: string, cost: number)
 	costLabel.Parent = billboard
 end
 
---- Spawn the building placeholder Part for an unlocked item.
+--- Spawn the building for an unlocked item. Uses real model from ServerStorage if available,
+--- otherwise falls back to a placeholder Part.
 local function spawnBuildingPart(folder: Folder, item: any, cf: CFrame)
+	-- Try to clone a real model from ServerStorage.TycoonModels
+	if TycoonModels then
+		local template = TycoonModels:FindFirstChild(item.modelName)
+		if template then
+			local model = template:Clone()
+			model.Name = item.modelName
+
+			-- Anchor all parts
+			for _, desc in model:GetDescendants() do
+				if desc:IsA("BasePart") then
+					desc.Anchored = true
+				end
+			end
+
+			-- Position the model
+			if model:IsA("Model") then
+				if model.PrimaryPart then
+					model:PivotTo(cf + Vector3.new(0, 0, 0))
+				else
+					-- Set PrimaryPart to first BasePart found
+					for _, desc in model:GetDescendants() do
+						if desc:IsA("BasePart") then
+							model.PrimaryPart = desc
+							break
+						end
+					end
+					if model.PrimaryPart then
+						model:PivotTo(cf + Vector3.new(0, 0, 0))
+					end
+				end
+			elseif model:IsA("BasePart") then
+				model.CFrame = cf + Vector3.new(0, model.Size.Y / 2, 0)
+			end
+
+			-- Name tag above the model
+			local nameGui = Instance.new("BillboardGui")
+			nameGui.Name = "NameGui"
+			nameGui.Size = UDim2.new(0, 200, 0, 40)
+			nameGui.StudsOffset = Vector3.new(0, 15, 0)
+			nameGui.AlwaysOnTop = false
+			if model:IsA("Model") and model.PrimaryPart then
+				nameGui.Adornee = model.PrimaryPart
+				nameGui.Parent = model.PrimaryPart
+			else
+				nameGui.Parent = model
+			end
+
+			local nameLabel = Instance.new("TextLabel")
+			nameLabel.Size = UDim2.new(1, 0, 1, 0)
+			nameLabel.BackgroundTransparency = 1
+			nameLabel.TextColor3 = Color3.new(1, 1, 1)
+			nameLabel.TextScaled = true
+			nameLabel.Font = Enum.Font.GothamBold
+			nameLabel.Text = item.name
+			nameLabel.TextStrokeTransparency = 0.5
+			nameLabel.Parent = nameGui
+
+			model.Parent = folder
+			return model
+		end
+	end
+
+	-- Fallback: placeholder Part
 	local category: TycoonItemCategory = item.category
 	local color = CATEGORY_COLOR[category] or BrickColor.new("Medium stone grey")
 
-	-- Size varies slightly by category for visual variety
 	local size: Vector3
 	if category == "Building" then
 		size = Vector3.new(16, 12, 16)
@@ -155,11 +222,9 @@ local function spawnBuildingPart(folder: Folder, item: any, cf: CFrame)
 	part.BrickColor = color
 	part.Material = Enum.Material.SmoothPlastic
 
-	-- Aircraft float above ground
 	local heightAdjust = if category == "Aircraft" then 10 else size.Y / 2
 	part.CFrame = cf + Vector3.new(0, heightAdjust, 0)
 
-	-- Name tag
 	local nameGui = Instance.new("BillboardGui")
 	nameGui.Name = "NameGui"
 	nameGui.Size = UDim2.new(0, 160, 0, 40)
@@ -218,11 +283,46 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
 	local base = Instance.new("Part")
 	base.Name = "BasePlatform"
 	base.Anchored = true
-	base.Size = Vector3.new(200, 2, 200)
+	base.Size = Vector3.new(250, 2, 400)
 	base.BrickColor = BrickColor.new("Sand green")
 	base.Material = Enum.Material.Grass
-	base.CFrame = origin + Vector3.new(0, -1, 50) -- centre the platform around the play area
+	base.CFrame = origin + Vector3.new(0, -1, 150) -- centre the platform around the play area
 	base.Parent = folder
+
+	-- SpawnLocation so player spawns on the pad
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "TycoonSpawn"
+	spawn.Anchored = true
+	spawn.Size = Vector3.new(8, 1, 8)
+	spawn.CFrame = origin + Vector3.new(0, 0.5, 10)
+	spawn.Transparency = 1
+	spawn.CanCollide = false
+	spawn.TeamColor = BrickColor.new("Medium stone grey")
+	spawn.Neutral = true
+	spawn.Parent = folder
+
+	-- Invisible walls around the platform edges to prevent falling off
+	local wallHeight = 20
+	local wallThickness = 2
+	local platWidth = 250
+	local platDepth = 400
+	local platCenterZ = 150
+	local walls = {
+		{ offset = Vector3.new(0, wallHeight / 2, platCenterZ - platDepth / 2), size = Vector3.new(platWidth, wallHeight, wallThickness) }, -- -Z
+		{ offset = Vector3.new(0, wallHeight / 2, platCenterZ + platDepth / 2), size = Vector3.new(platWidth, wallHeight, wallThickness) }, -- +Z
+		{ offset = Vector3.new(-platWidth / 2, wallHeight / 2, platCenterZ), size = Vector3.new(wallThickness, wallHeight, platDepth) }, -- -X
+		{ offset = Vector3.new(platWidth / 2, wallHeight / 2, platCenterZ), size = Vector3.new(wallThickness, wallHeight, platDepth) }, -- +X
+	}
+	for i, wallDef in walls do
+		local wall = Instance.new("Part")
+		wall.Name = "Wall_" .. i
+		wall.Anchored = true
+		wall.Size = wallDef.size
+		wall.CFrame = origin + wallDef.offset
+		wall.Transparency = 1
+		wall.CanCollide = true
+		wall.Parent = folder
+	end
 
 	-- Spawn free tier-1 Command Center
 	local ccItem = TycoonConfig.Items["CommandCenter"]
