@@ -28,6 +28,8 @@ local HUD: {
 	UpdateIncome: (rate: number) -> (),
 	ShowUnlockNotification: (itemName: string, description: string) -> (),
 	UpdateBaseLevel: (level: number) -> (),
+	UpdateBaseHP: (current: number, max: number) -> (),
+	ShowInsufficientFunds: (needed: number) -> (),
 } | nil =
 	nil
 

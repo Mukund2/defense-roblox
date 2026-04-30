@@ -9,6 +9,7 @@ local DataManager = require(script.Parent.DataManager) :: any
 local TycoonBuilder = require(script.Parent.TycoonBuilder) :: any
 local IncomeManager = require(script.Parent.IncomeManager) :: any
 local UnitManager = require(script.Parent.UnitManager) :: any
+local LeaderboardManager = require(script.Parent.LeaderboardManager) :: any
 
 -- ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ IncomeManager.SetTickCallback(function(player: Player, amount: number)
 	state.balance += amount
 	state.lastSave = state.lastSave -- keep reference (actual save is on leave)
 	fireUpdateMoney(player, state.balance)
+	LeaderboardManager.UpdateCash(player, state.balance)
 end)
 
 -- ── Player join ───────────────────────────────────────────────────────────────
@@ -103,6 +105,12 @@ local function onPlayerAdded(player: Player)
 		lastSave = os.time(),
 	}
 	tycoons[player] = state
+
+	-- Setup leaderboard stats
+	LeaderboardManager.Setup(player)
+	LeaderboardManager.UpdateCash(player, state.balance)
+	LeaderboardManager.UpdateIncome(player, state.incomePerSecond)
+	LeaderboardManager.UpdateLevel(player, #state.unlockedItems)
 
 	-- Build the tycoon in the world
 	TycoonBuilder.SetupTycoonPad(padNumber, player)
@@ -172,6 +180,13 @@ local function onPlayerAdded(player: Player)
 	fireUpdateMoney(player, state.balance)
 	Remotes.UpdateIncome:FireClient(player, state.incomePerSecond)
 
+	-- Register base with combat system
+	task.defer(function()
+		if _G.CombatAPI then
+			_G.CombatAPI.RegisterBase(player, padNumber, state.unlockedItems)
+		end
+	end)
+
 	print(
 		string.format(
 			"[TycoonManager] %s joined → pad %d | $%d | %d ips",
@@ -201,6 +216,11 @@ local function onPlayerRemoving(player: Player)
 		unlockedItems = state.unlockedItems,
 		totalEarned = 0, -- totalEarned tracked separately if needed
 	})
+
+	-- Unregister from combat
+	if _G.CombatAPI then
+		_G.CombatAPI.UnregisterBase(player)
+	end
 
 	-- Clean up units and the world
 	UnitManager.DespawnAllUnits(state.pad)
@@ -269,6 +289,16 @@ local function onPurchaseRequest(player: Player, itemName: string)
 		UnitManager.SpawnUnit(state.pad, unitSpec.name)
 	end
 
+	-- Update leaderboard
+	LeaderboardManager.UpdateCash(player, state.balance)
+	LeaderboardManager.UpdateIncome(player, state.incomePerSecond)
+	LeaderboardManager.UpdateLevel(player, #state.unlockedItems)
+
+	-- Notify combat system about new building
+	if _G.CombatAPI then
+		_G.CombatAPI.OnBuildingUnlocked(player, state.unlockedItems)
+	end
+
 	-- Notify client
 	Remotes.UnlockItem:FireClient(player, item.name, item.description)
 	Remotes.UpdateIncome:FireClient(player, state.incomePerSecond)
@@ -284,6 +314,34 @@ local function onPurchaseRequest(player: Player, itemName: string)
 			state.incomePerSecond
 		)
 	)
+end
+
+-- ── Combat integration ────────────────────────────────────────────────────────
+-- CombatManager.server.luau uses _G.CombatAPI (set by that script).
+-- We expose fund deduction/reward callbacks via _G so CombatManager can call them.
+
+_G.CombatDeductFunds = function(player: Player, amount: number): boolean
+	local state = tycoons[player]
+	if not state then
+		return false
+	end
+	if state.balance < amount then
+		return false
+	end
+	state.balance -= amount
+	fireUpdateMoney(player, state.balance)
+	LeaderboardManager.UpdateCash(player, state.balance)
+	return true
+end
+
+_G.CombatRewardFunds = function(player: Player, amount: number)
+	local state = tycoons[player]
+	if not state then
+		return
+	end
+	state.balance += amount
+	fireUpdateMoney(player, state.balance)
+	LeaderboardManager.UpdateCash(player, state.balance)
 end
 
 -- ── Wire up events ────────────────────────────────────────────────────────────

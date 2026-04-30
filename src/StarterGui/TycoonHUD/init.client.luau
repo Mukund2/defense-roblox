@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local FormatNumber = require(ReplicatedStorage:WaitForChild("FormatNumber", 30) :: ModuleScript)
+local TycoonConfig = require(ReplicatedStorage:WaitForChild("TycoonConfig", 30) :: ModuleScript)
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -24,6 +25,7 @@ local COLOR = {
 	GRAY = Color3.fromRGB(160, 170, 180),
 	STROKE_GREEN = Color3.fromRGB(60, 100, 72),
 	TRANSPARENT = Color3.fromRGB(0, 0, 0),
+	RED = Color3.fromRGB(200, 60, 60),
 }
 
 local MAX_BASE_LEVEL = 15
@@ -126,6 +128,70 @@ local IncomeLabel =
 IncomeLabel.Size = UDim2.new(0, 90, 1, 0)
 
 -- ═════════════════════════════════════════════════════════════════════════════
+-- INSUFFICIENT FUNDS FEEDBACK — appears below top bar
+-- ═════════════════════════════════════════════════════════════════════════════
+
+local InsufficientLabel = Instance.new("TextLabel")
+InsufficientLabel.Name = "InsufficientLabel"
+InsufficientLabel.AnchorPoint = Vector2.new(0.5, 0)
+InsufficientLabel.Position = UDim2.new(0.5, 0, 0, 82)
+InsufficientLabel.Size = UDim2.new(0, 260, 0, 24)
+InsufficientLabel.BackgroundTransparency = 1
+InsufficientLabel.Text = ""
+InsufficientLabel.Font = Enum.Font.GothamBold
+InsufficientLabel.TextSize = 14
+InsufficientLabel.TextColor3 = COLOR.RED
+InsufficientLabel.TextTransparency = 1
+InsufficientLabel.ZIndex = 8
+InsufficientLabel.Parent = ScreenGui
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- BASE HP BAR — placeholder for Phase 3 combat (hidden by default)
+-- ═════════════════════════════════════════════════════════════════════════════
+
+local HPBar = Instance.new("Frame")
+HPBar.Name = "HPBar"
+HPBar.AnchorPoint = Vector2.new(0.5, 0)
+HPBar.Position = UDim2.new(0.5, 0, 0, 82)
+HPBar.Size = UDim2.new(0, 320, 0, 32)
+HPBar.BackgroundColor3 = COLOR.BG_DARK
+HPBar.BackgroundTransparency = 0.12
+HPBar.BorderSizePixel = 0
+HPBar.Visible = false -- hidden until combat phase
+HPBar.Parent = ScreenGui
+applyCorner(HPBar, 6)
+applyStroke(HPBar, COLOR.STROKE_GREEN, 1)
+applyPadding(HPBar, 8, 6)
+
+local HPLabel = newLabel(HPBar, "HPLabel", "BASE HP: 100/100", Enum.Font.GothamBold, 11, COLOR.WHITE, COLOR.TRANSPARENT, 1)
+HPLabel.Size = UDim2.new(1, 0, 0, 12)
+HPLabel.TextXAlignment = Enum.TextXAlignment.Left
+HPLabel.LayoutOrder = 1
+
+local HPBarLayout = Instance.new("UIListLayout")
+HPBarLayout.FillDirection = Enum.FillDirection.Vertical
+HPBarLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+HPBarLayout.Padding = UDim.new(0, 3)
+HPBarLayout.Parent = HPBar
+
+local HPBarContainer = Instance.new("Frame")
+HPBarContainer.Name = "HPBarContainer"
+HPBarContainer.Size = UDim2.new(1, 0, 0, 8)
+HPBarContainer.BackgroundColor3 = COLOR.BG_PANEL
+HPBarContainer.BorderSizePixel = 0
+HPBarContainer.LayoutOrder = 2
+HPBarContainer.Parent = HPBar
+applyCorner(HPBarContainer, 3)
+
+local HPFill = Instance.new("Frame")
+HPFill.Name = "HPFill"
+HPFill.Size = UDim2.new(1, 0, 1, 0)
+HPFill.BackgroundColor3 = COLOR.GREEN
+HPFill.BorderSizePixel = 0
+HPFill.Parent = HPBarContainer
+applyCorner(HPFill, 3)
+
+-- ═════════════════════════════════════════════════════════════════════════════
 -- BOTTOM-LEFT PANEL — base level
 -- ═════════════════════════════════════════════════════════════════════════════
 
@@ -180,6 +246,144 @@ ProgressFill.Parent = BarContainer
 applyCorner(ProgressFill, 4)
 
 -- ═════════════════════════════════════════════════════════════════════════════
+-- BOTTOM-RIGHT — Shop toggle button
+-- ═════════════════════════════════════════════════════════════════════════════
+
+local ShopButton = Instance.new("TextButton")
+ShopButton.Name = "ShopButton"
+ShopButton.AnchorPoint = Vector2.new(1, 1)
+ShopButton.Position = UDim2.new(1, -16, 1, -16)
+ShopButton.Size = UDim2.new(0, 80, 0, 40)
+ShopButton.BackgroundColor3 = COLOR.GREEN
+ShopButton.Text = "SHOP"
+ShopButton.Font = Enum.Font.GothamBold
+ShopButton.TextSize = 16
+ShopButton.TextColor3 = COLOR.WHITE
+ShopButton.BorderSizePixel = 0
+ShopButton.Parent = ScreenGui
+applyCorner(ShopButton, 8)
+applyStroke(ShopButton, COLOR.STROKE_GREEN, 1)
+
+ShopButton.MouseButton1Click:Connect(function()
+	local shopApi = _G.ShopGUI :: any
+	if shopApi and shopApi.Toggle then
+		shopApi.Toggle()
+	end
+end)
+
+-- ═════════════════════════════════════════════════════════════════════════════
+-- RIGHT SIDE — "NEXT UNLOCK" panel
+-- ═════════════════════════════════════════════════════════════════════════════
+
+local NextUnlockPanel = Instance.new("Frame")
+NextUnlockPanel.Name = "NextUnlockPanel"
+NextUnlockPanel.AnchorPoint = Vector2.new(1, 0.5)
+NextUnlockPanel.Position = UDim2.new(1, -16, 0.5, 30)
+NextUnlockPanel.Size = UDim2.new(0, 200, 0, 120)
+NextUnlockPanel.BackgroundColor3 = COLOR.BG_DARK
+NextUnlockPanel.BackgroundTransparency = 0.12
+NextUnlockPanel.BorderSizePixel = 0
+NextUnlockPanel.Parent = ScreenGui
+applyCorner(NextUnlockPanel, 8)
+applyStroke(NextUnlockPanel, COLOR.STROKE_GREEN, 1)
+applyPadding(NextUnlockPanel, 10, 8)
+
+local NextUnlockLayout = Instance.new("UIListLayout")
+NextUnlockLayout.FillDirection = Enum.FillDirection.Vertical
+NextUnlockLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+NextUnlockLayout.Padding = UDim.new(0, 4)
+NextUnlockLayout.Parent = NextUnlockPanel
+
+local NextUnlockHeader = newLabel(
+	NextUnlockPanel,
+	"NextUnlockHeader",
+	"NEXT UNLOCK",
+	Enum.Font.GothamBold,
+	11,
+	COLOR.AMBER,
+	COLOR.TRANSPARENT,
+	1
+)
+NextUnlockHeader.Size = UDim2.new(1, 0, 0, 14)
+NextUnlockHeader.TextXAlignment = Enum.TextXAlignment.Left
+NextUnlockHeader.LayoutOrder = 1
+
+local NextItemName = newLabel(
+	NextUnlockPanel,
+	"NextItemName",
+	"---",
+	Enum.Font.GothamBold,
+	14,
+	COLOR.WHITE,
+	COLOR.TRANSPARENT,
+	1
+)
+NextItemName.Size = UDim2.new(1, 0, 0, 18)
+NextItemName.TextXAlignment = Enum.TextXAlignment.Left
+NextItemName.LayoutOrder = 2
+
+local NextItemCost = newLabel(
+	NextUnlockPanel,
+	"NextItemCost",
+	"$0",
+	Enum.Font.GothamMedium,
+	12,
+	COLOR.AMBER,
+	COLOR.TRANSPARENT,
+	1
+)
+NextItemCost.Size = UDim2.new(1, 0, 0, 14)
+NextItemCost.TextXAlignment = Enum.TextXAlignment.Left
+NextItemCost.LayoutOrder = 3
+
+local NextItemIncome = newLabel(
+	NextUnlockPanel,
+	"NextItemIncome",
+	"+$0/s",
+	Enum.Font.GothamMedium,
+	11,
+	COLOR.GREEN_LIGHT,
+	COLOR.TRANSPARENT,
+	1
+)
+NextItemIncome.Size = UDim2.new(1, 0, 0, 14)
+NextItemIncome.TextXAlignment = Enum.TextXAlignment.Left
+NextItemIncome.LayoutOrder = 4
+
+-- Progress bar: money towards next item
+local NextBarContainer = Instance.new("Frame")
+NextBarContainer.Name = "NextBarContainer"
+NextBarContainer.Size = UDim2.new(1, 0, 0, 10)
+NextBarContainer.BackgroundColor3 = COLOR.BG_PANEL
+NextBarContainer.BorderSizePixel = 0
+NextBarContainer.LayoutOrder = 5
+NextBarContainer.Parent = NextUnlockPanel
+applyCorner(NextBarContainer, 4)
+applyStroke(NextBarContainer, COLOR.GREEN_DIM, 1)
+
+local NextBarFill = Instance.new("Frame")
+NextBarFill.Name = "NextBarFill"
+NextBarFill.Size = UDim2.new(0, 0, 1, 0)
+NextBarFill.BackgroundColor3 = COLOR.GREEN
+NextBarFill.BorderSizePixel = 0
+NextBarFill.Parent = NextBarContainer
+applyCorner(NextBarFill, 4)
+
+local NextBarPercent = newLabel(
+	NextUnlockPanel,
+	"NextBarPercent",
+	"0%",
+	Enum.Font.GothamMedium,
+	10,
+	COLOR.GRAY,
+	COLOR.TRANSPARENT,
+	1
+)
+NextBarPercent.Size = UDim2.new(1, 0, 0, 12)
+NextBarPercent.TextXAlignment = Enum.TextXAlignment.Right
+NextBarPercent.LayoutOrder = 6
+
+-- ═════════════════════════════════════════════════════════════════════════════
 -- NOTIFICATION POPUP — item unlocked
 -- ═════════════════════════════════════════════════════════════════════════════
 
@@ -231,6 +435,7 @@ local MONEY_TWEEN_INFO = TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDi
 local NOTIF_TWEEN_INFO = TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 local NOTIF_OUT_INFO = TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
 local LEVEL_TWEEN_INFO = TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local HP_TWEEN_INFO = TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 
 -- Notification queue to prevent overlapping popups.
 local notifQueue: { { itemName: string, description: string } } = {}
@@ -239,8 +444,84 @@ local notifBusy = false
 -- Displayed money value (used as the tween start point).
 local displayedMoney = 0
 
+-- Track current money for next-unlock progress bar.
+local currentMoneyValue = 0
+
+-- Track unlocked count for next-unlock panel.
+local currentBaseLevel = 0
+
+-- ── Next Unlock helpers ─────────────────────────────────────────────────────
+
+local function getNextItem(): typeof(TycoonConfig.Ordered[1])?
+	-- The next item is at order = currentBaseLevel + 1
+	for _, item in TycoonConfig.Ordered do
+		if item.order == currentBaseLevel + 1 then
+			return item
+		end
+	end
+	return nil
+end
+
+local function refreshNextUnlock()
+	local nextItem = getNextItem()
+	if nextItem then
+		NextUnlockPanel.Visible = true
+		NextItemName.Text = nextItem.name
+		NextItemCost.Text = FormatNumber.money(nextItem.cost)
+		NextItemIncome.Text = "+" .. FormatNumber.money(nextItem.incomePerSecond) .. "/s"
+
+		local progress = if nextItem.cost > 0
+			then math.clamp(currentMoneyValue / nextItem.cost, 0, 1)
+			else 1
+		local pct = math.floor(progress * 100)
+		NextBarPercent.Text = tostring(pct) .. "%"
+
+		TweenService:Create(NextBarFill, HP_TWEEN_INFO, {
+			Size = UDim2.new(progress, 0, 1, 0),
+		}):Play()
+	else
+		-- All items unlocked
+		NextUnlockPanel.Visible = false
+	end
+end
+
+-- ── Insufficient funds feedback ─────────────────────────────────────────────
+
+local insufficientThread: thread? = nil
+
+local function ShowInsufficientFunds(needed: number)
+	-- Flash the money label red
+	local origColor = MoneyLabel.TextColor3
+	MoneyLabel.TextColor3 = COLOR.RED
+	task.delay(0.3, function()
+		MoneyLabel.TextColor3 = origColor
+	end)
+
+	-- Show "Need $X more!" text
+	InsufficientLabel.Text = "Need " .. FormatNumber.money(needed) .. " more!"
+	InsufficientLabel.TextTransparency = 0
+
+	-- Cancel previous fade if still running
+	if insufficientThread then
+		task.cancel(insufficientThread)
+	end
+
+	insufficientThread = task.delay(2, function()
+		-- Fade out
+		local tween = TweenService:Create(InsufficientLabel, TweenInfo.new(0.5), {
+			TextTransparency = 1,
+		})
+		tween:Play()
+		insufficientThread = nil
+	end)
+end
+
+-- ── UpdateMoney ─────────────────────────────────────────────────────────────
+
 -- Counts money up (or down) from the current displayed value to the new value.
 local function UpdateMoney(amount: number)
+	currentMoneyValue = amount
+
 	-- We animate by tweening a proxy NumberValue.
 	local proxy = Instance.new("NumberValue")
 	proxy.Value = displayedMoney
@@ -255,6 +536,9 @@ local function UpdateMoney(amount: number)
 		proxy:Destroy()
 	end)
 	tween:Play()
+
+	-- Refresh next unlock progress
+	refreshNextUnlock()
 end
 
 local function UpdateIncome(rate: number)
@@ -302,6 +586,7 @@ end
 
 local function UpdateBaseLevel(level: number)
 	local clamped = math.clamp(level, 0, MAX_BASE_LEVEL)
+	currentBaseLevel = clamped
 	BaseLevelLabel.Text = "BASE LEVEL: " .. tostring(clamped) .. " / " .. MAX_BASE_LEVEL
 
 	local targetWidth = clamped / MAX_BASE_LEVEL
@@ -309,6 +594,33 @@ local function UpdateBaseLevel(level: number)
 		Size = UDim2.new(targetWidth, 0, 1, 0),
 	})
 	fillTween:Play()
+
+	-- Refresh next unlock panel (the next item changes when level changes)
+	refreshNextUnlock()
+end
+
+-- ── Base HP bar (Phase 3 placeholder) ───────────────────────────────────────
+
+local function UpdateBaseHP(current: number, max: number)
+	HPBar.Visible = true
+	HPLabel.Text = "BASE HP: " .. tostring(math.floor(current)) .. "/" .. tostring(math.floor(max))
+
+	local ratio = if max > 0 then math.clamp(current / max, 0, 1) else 0
+
+	-- Color shifts from green to red as HP drops
+	local hpColor: Color3
+	if ratio > 0.5 then
+		hpColor = COLOR.GREEN
+	elseif ratio > 0.25 then
+		hpColor = COLOR.AMBER
+	else
+		hpColor = COLOR.RED
+	end
+
+	HPFill.BackgroundColor3 = hpColor
+	TweenService:Create(HPFill, HP_TWEEN_INFO, {
+		Size = UDim2.new(ratio, 0, 1, 0),
+	}):Play()
 end
 
 -- ── Publish API ───────────────────────────────────────────────────────────────
@@ -318,4 +630,6 @@ _G.TycoonHUD = {
 	UpdateIncome = UpdateIncome,
 	ShowUnlockNotification = ShowUnlockNotification,
 	UpdateBaseLevel = UpdateBaseLevel,
+	UpdateBaseHP = UpdateBaseHP,
+	ShowInsufficientFunds = ShowInsufficientFunds,
 }

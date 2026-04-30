@@ -29,6 +29,8 @@ export type RemotesType = {
 	ClaimTycoon: RemoteEvent, -- Fired when a player clicks a base pad to claim it.
 	PurchaseItem: RemoteEvent, -- Fired when a player activates a purchase button.
 	--   args: itemName: string
+	LaunchAttack: RemoteEvent, -- Fired when a player launches an attack on another base.
+	--   args: attackType: string, targetPadNumber: number
 
 	-- Server → Client
 	UpdateMoney: RemoteEvent, -- Tells the client their current cash balance.
@@ -37,6 +39,18 @@ export type RemotesType = {
 	--   args: perSecond: number
 	UnlockItem: RemoteEvent, -- Tells the client a tycoon item was just unlocked.
 	--   args: itemName: string
+	AttackWarning: RemoteEvent, -- Warns the client of an incoming attack.
+	--   args: attackType: string, attackerName: string, eta: number
+	BaseDamaged: RemoteEvent, -- Tells the client their base took damage.
+	--   args: currentHP: number, maxHP: number, damage: number, attackType: string
+	BaseDestroyed: RemoteEvent, -- Tells the client their base was destroyed.
+	--   args: attackerName: string
+	AttackLaunched: RemoteEvent, -- Tells all clients about an attack for visual effects.
+	--   args: attackType: string, fromPad: number, toPad: number, travelTime: number
+	UpdateShield: RemoteEvent, -- Tells the client their shield status changed.
+	--   args: currentShield: number, maxShield: number
+	AttackResult: RemoteEvent, -- Tells the attacker the result of their attack.
+	--   args: success: boolean, message: string
 
 	-- Client → Server (with response)
 	GetPlayerData: RemoteFunction, -- Client requests its full save data snapshot.
@@ -92,12 +106,21 @@ end
 -- ── Remote construction ───────────────────────────────────────────────────
 
 local Remotes: RemotesType = table.freeze({
+	-- Tycoon
 	ClaimTycoon = getOrCreate(folder, "RemoteEvent", "ClaimTycoon") :: RemoteEvent,
 	PurchaseItem = getOrCreate(folder, "RemoteEvent", "PurchaseItem") :: RemoteEvent,
 	UpdateMoney = getOrCreate(folder, "RemoteEvent", "UpdateMoney") :: RemoteEvent,
 	UpdateIncome = getOrCreate(folder, "RemoteEvent", "UpdateIncome") :: RemoteEvent,
 	UnlockItem = getOrCreate(folder, "RemoteEvent", "UnlockItem") :: RemoteEvent,
 	GetPlayerData = getOrCreate(folder, "RemoteFunction", "GetPlayerData") :: RemoteFunction,
+	-- Combat
+	LaunchAttack = getOrCreate(folder, "RemoteEvent", "LaunchAttack") :: RemoteEvent,
+	AttackWarning = getOrCreate(folder, "RemoteEvent", "AttackWarning") :: RemoteEvent,
+	BaseDamaged = getOrCreate(folder, "RemoteEvent", "BaseDamaged") :: RemoteEvent,
+	BaseDestroyed = getOrCreate(folder, "RemoteEvent", "BaseDestroyed") :: RemoteEvent,
+	AttackLaunched = getOrCreate(folder, "RemoteEvent", "AttackLaunched") :: RemoteEvent,
+	UpdateShield = getOrCreate(folder, "RemoteEvent", "UpdateShield") :: RemoteEvent,
+	AttackResult = getOrCreate(folder, "RemoteEvent", "AttackResult") :: RemoteEvent,
 })
 
 return Remotes

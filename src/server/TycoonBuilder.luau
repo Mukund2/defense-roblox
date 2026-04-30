@@ -32,11 +32,11 @@ local CATEGORY_COLOR: { [TycoonItemCategory]: BrickColor } = {
 	Strategic = BrickColor.new("Bright red"),
 }
 
--- Button colour (neon cyan)
-local BUTTON_COLOR = BrickColor.new("Cyan")
+-- Button colour (neon green)
+local BUTTON_COLOR = BrickColor.new("Lime green")
 local BUTTON_MATERIAL = Enum.Material.Neon
-local BUTTON_SIZE = Vector3.new(8, 0.5, 8)
-local BUTTON_HEIGHT_OFFSET = 0.5 -- elevate slightly above ground
+local BUTTON_SIZE = Vector3.new(14, 1.5, 14)
+local BUTTON_HEIGHT_OFFSET = 1 -- elevate slightly above ground
 
 -- Parent folder name inside Workspace for all tycoon parts
 local TYCOON_FOLDER_PREFIX = "Tycoon_Pad_"
@@ -101,17 +101,18 @@ local function nextUnlockable(unlockedItems: { string }): any?
 end
 
 --- Create a BillboardGui label for a purchase button.
-local function createButtonGui(parent: Part, itemName: string, cost: number)
+local function createButtonGui(parent: Part, itemName: string, cost: number, incomePerSecond: number, description: string)
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "ButtonGui"
-	billboard.Size = UDim2.new(0, 200, 0, 60)
-	billboard.StudsOffset = Vector3.new(0, 2, 0)
+	billboard.Size = UDim2.new(0, 350, 0, 120)
+	billboard.StudsOffset = Vector3.new(0, 4, 0)
 	billboard.AlwaysOnTop = false
 	billboard.Parent = parent
 
+	-- Item name label (top 30%)
 	local label = Instance.new("TextLabel")
 	label.Name = "Label"
-	label.Size = UDim2.new(1, 0, 0.5, 0)
+	label.Size = UDim2.new(1, 0, 0.3, 0)
 	label.BackgroundTransparency = 1
 	label.TextColor3 = Color3.new(1, 1, 1)
 	label.TextScaled = true
@@ -119,16 +120,39 @@ local function createButtonGui(parent: Part, itemName: string, cost: number)
 	label.Text = itemName
 	label.Parent = billboard
 
+	-- Cost label with green background frame (middle 35%)
+	local costFrame = Instance.new("Frame")
+	costFrame.Name = "CostFrame"
+	costFrame.Size = UDim2.new(0.7, 0, 0.3, 0)
+	costFrame.Position = UDim2.new(0.15, 0, 0.3, 0)
+	costFrame.BackgroundColor3 = Color3.fromRGB(30, 120, 30)
+	costFrame.BackgroundTransparency = 0.3
+	costFrame.Parent = billboard
+	local costCorner = Instance.new("UICorner")
+	costCorner.CornerRadius = UDim.new(0, 6)
+	costCorner.Parent = costFrame
+
 	local costLabel = Instance.new("TextLabel")
 	costLabel.Name = "CostLabel"
-	costLabel.Size = UDim2.new(1, 0, 0.5, 0)
-	costLabel.Position = UDim2.new(0, 0, 0.5, 0)
+	costLabel.Size = UDim2.new(1, 0, 1, 0)
 	costLabel.BackgroundTransparency = 1
 	costLabel.TextColor3 = Color3.new(1, 0.85, 0)
 	costLabel.TextScaled = true
-	costLabel.Font = Enum.Font.Gotham
+	costLabel.Font = Enum.Font.GothamBold
 	costLabel.Text = "$" .. tostring(cost)
-	costLabel.Parent = billboard
+	costLabel.Parent = costFrame
+
+	-- Income boost label (bottom 30%)
+	local incomeLabel = Instance.new("TextLabel")
+	incomeLabel.Name = "IncomeLabel"
+	incomeLabel.Size = UDim2.new(1, 0, 0.3, 0)
+	incomeLabel.Position = UDim2.new(0, 0, 0.65, 0)
+	incomeLabel.BackgroundTransparency = 1
+	incomeLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+	incomeLabel.TextScaled = true
+	incomeLabel.Font = Enum.Font.GothamBold
+	incomeLabel.Text = "+$" .. tostring(incomePerSecond) .. "/sec"
+	incomeLabel.Parent = billboard
 end
 
 --- Spawn the building for an unlocked item. Uses real model from ServerStorage if available,
@@ -254,7 +278,38 @@ local function spawnPurchaseButton(folder: Folder, item: any, cf: CFrame): Part
 	button.BrickColor = BUTTON_COLOR
 	button.Material = BUTTON_MATERIAL
 	button.CFrame = cf + Vector3.new(0, BUTTON_HEIGHT_OFFSET, 0)
-	createButtonGui(button, item.name, item.cost)
+	createButtonGui(button, item.name, item.cost, item.incomePerSecond, item.description)
+
+	-- PointLight inside the button
+	local pointLight = Instance.new("PointLight")
+	pointLight.Brightness = 2
+	pointLight.Range = 25
+	pointLight.Color = Color3.fromRGB(80, 255, 80)
+	pointLight.Parent = button
+
+	-- Particle emitter (green rising particles)
+	local particles = Instance.new("ParticleEmitter")
+	particles.Color = ColorSequence.new(Color3.fromRGB(80, 255, 80))
+	particles.Rate = 8
+	particles.Lifetime = NumberRange.new(1.5)
+	particles.Speed = NumberRange.new(3)
+	particles.SpreadAngle = Vector2.new(15, 15)
+	particles.EmissionDirection = Enum.NormalId.Top
+	particles.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
+	particles.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
+	particles.Parent = button
+
+	-- Vertical beacon (tall semi-transparent green pillar)
+	local beacon = Instance.new("Part")
+	beacon.Name = "Beacon"
+	beacon.Anchored = true
+	beacon.CanCollide = false
+	beacon.Size = Vector3.new(2, 40, 2)
+	beacon.BrickColor = BrickColor.new("Lime green")
+	beacon.Material = Enum.Material.Neon
+	beacon.Transparency = 0.7
+	beacon.CFrame = cf + Vector3.new(0, 20 + BUTTON_HEIGHT_OFFSET, 0)
+	beacon.Parent = folder
 
 	-- Tag so client can identify which item this button belongs to
 	button:SetAttribute("TycoonItem", item.modelName)
@@ -279,17 +334,202 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
 	local folder = getOrCreatePadFolder(padNumber)
 	local origin = padOriginCFrame(padNumber)
 
-	-- Base platform
+	local platWidth = 250
+	local platDepth = 400
+	local platCenterZ = 150
+
+	-- ── Phase 1B: Terrain & Environment ─────────────────────────────────────
+
+	-- Surrounding grass platform (slightly larger, underneath)
+	local grass = Instance.new("Part")
+	grass.Name = "GrassPlatform"
+	grass.Anchored = true
+	grass.Size = Vector3.new(platWidth + 40, 3, platDepth + 40)
+	grass.BrickColor = BrickColor.new("Sand green")
+	grass.Material = Enum.Material.Grass
+	grass.CFrame = origin + Vector3.new(0, -2.5, platCenterZ)
+	grass.Parent = folder
+
+	-- Concrete base platform (building area)
 	local base = Instance.new("Part")
 	base.Name = "BasePlatform"
 	base.Anchored = true
-	base.Size = Vector3.new(250, 2, 400)
-	base.BrickColor = BrickColor.new("Sand green")
-	base.Material = Enum.Material.Grass
-	base.CFrame = origin + Vector3.new(0, -1, 150) -- centre the platform around the play area
+	base.Size = Vector3.new(platWidth, 2, platDepth)
+	base.BrickColor = BrickColor.new("Dark stone grey")
+	base.Material = Enum.Material.Concrete
+	base.CFrame = origin + Vector3.new(0, -1, platCenterZ)
 	base.Parent = folder
 
-	-- SpawnLocation so player spawns on the pad
+	-- Water body behind the base (for naval units)
+	local water = Instance.new("Part")
+	water.Name = "WaterBody"
+	water.Anchored = true
+	water.Size = Vector3.new(platWidth + 40, 2, 120)
+	water.BrickColor = BrickColor.new("Bright blue")
+	water.Material = Enum.Material.Water
+	water.CFrame = origin + Vector3.new(0, -2, platCenterZ + platDepth / 2 + 70)
+	water.CanCollide = false
+	water.Parent = folder
+
+	-- Runway strip along -X side
+	local runway = Instance.new("Part")
+	runway.Name = "Runway"
+	runway.Anchored = true
+	runway.Size = Vector3.new(200, 1, 20)
+	runway.BrickColor = BrickColor.new("Really black")
+	runway.Material = Enum.Material.SmoothPlastic
+	runway.CFrame = origin + Vector3.new(0, 0.01, -15)
+	runway.Parent = folder
+
+	-- Runway center line markings (white dashes)
+	for dash = 0, 7 do
+		local mark = Instance.new("Part")
+		mark.Name = "RunwayMark_" .. dash
+		mark.Anchored = true
+		mark.Size = Vector3.new(12, 0.1, 1)
+		mark.BrickColor = BrickColor.new("White")
+		mark.Material = Enum.Material.SmoothPlastic
+		mark.CFrame = origin + Vector3.new(-87.5 + dash * 25, 0.55, -15)
+		mark.Parent = folder
+	end
+
+	-- ── Perimeter fence posts (2 sides: -X and +X edges) ────────────────────
+	local fenceZ_start = platCenterZ - platDepth / 2 + 20
+	local fenceZ_end = platCenterZ + platDepth / 2 - 20
+	local fenceCount = 10
+	local fenceSpacing = (fenceZ_end - fenceZ_start) / (fenceCount - 1)
+
+	for side = -1, 1, 2 do
+		local xPos = side * (platWidth / 2 - 2)
+		for p = 0, fenceCount - 1 do
+			local zPos = fenceZ_start + p * fenceSpacing
+			-- Vertical post
+			local post = Instance.new("Part")
+			post.Name = "FencePost"
+			post.Anchored = true
+			post.Size = Vector3.new(1, 4, 1)
+			post.BrickColor = BrickColor.new("Dark stone grey")
+			post.Material = Enum.Material.Metal
+			post.CFrame = origin + Vector3.new(xPos, 2, zPos)
+			post.Parent = folder
+
+			-- Horizontal bar connecting to next post
+			if p < fenceCount - 1 then
+				local bar = Instance.new("Part")
+				bar.Name = "FenceBar"
+				bar.Anchored = true
+				bar.Size = Vector3.new(1, 0.5, fenceSpacing)
+				bar.BrickColor = BrickColor.new("Dark stone grey")
+				bar.Material = Enum.Material.Metal
+				bar.CFrame = origin + Vector3.new(xPos, 3.5, zPos + fenceSpacing / 2)
+				bar.Parent = folder
+			end
+		end
+	end
+
+	-- ── Decorative trees (on the grass border area) ─────────────────────────
+	local treePositions = {
+		Vector3.new(-platWidth / 2 - 10, 0, 30),
+		Vector3.new(platWidth / 2 + 10, 0, 30),
+		Vector3.new(-platWidth / 2 - 10, 0, 150),
+		Vector3.new(platWidth / 2 + 10, 0, 150),
+		Vector3.new(-platWidth / 2 - 10, 0, 280),
+		Vector3.new(platWidth / 2 + 10, 0, 310),
+	}
+	for t, treeOff in treePositions do
+		-- Brown trunk
+		local trunk = Instance.new("Part")
+		trunk.Name = "TreeTrunk_" .. t
+		trunk.Anchored = true
+		trunk.Size = Vector3.new(2, 6, 2)
+		trunk.BrickColor = BrickColor.new("Reddish brown")
+		trunk.Material = Enum.Material.Wood
+		trunk.CFrame = origin + treeOff + Vector3.new(0, 2, 0)
+		trunk.Parent = folder
+
+		-- Green canopy (sphere)
+		local canopy = Instance.new("Part")
+		canopy.Name = "TreeCanopy_" .. t
+		canopy.Anchored = true
+		canopy.Shape = Enum.PartType.Ball
+		canopy.Size = Vector3.new(8, 8, 8)
+		canopy.BrickColor = BrickColor.new("Forest green")
+		canopy.Material = Enum.Material.Grass
+		canopy.CFrame = origin + treeOff + Vector3.new(0, 9, 0)
+		canopy.Parent = folder
+	end
+
+	-- ── Rock clusters at corners ────────────────────────────────────────────
+	local rockCorners = {
+		Vector3.new(-platWidth / 2 + 10, 0, platCenterZ - platDepth / 2 + 10),
+		Vector3.new(platWidth / 2 - 10, 0, platCenterZ - platDepth / 2 + 10),
+		Vector3.new(-platWidth / 2 + 10, 0, platCenterZ + platDepth / 2 - 10),
+		Vector3.new(platWidth / 2 - 10, 0, platCenterZ + platDepth / 2 - 10),
+	}
+	for c, cornerOff in rockCorners do
+		-- 3 rocks per cluster
+		local rockSizes = {
+			Vector3.new(4, 3, 4),
+			Vector3.new(3, 2, 3),
+			Vector3.new(2, 2, 2),
+		}
+		local rockOffsets = {
+			Vector3.new(0, 1.5, 0),
+			Vector3.new(3, 1, 2),
+			Vector3.new(-2, 1, 1),
+		}
+		for r = 1, 3 do
+			local rock = Instance.new("Part")
+			rock.Name = "Rock_" .. c .. "_" .. r
+			rock.Anchored = true
+			rock.Size = rockSizes[r]
+			rock.BrickColor = BrickColor.new("Medium stone grey")
+			rock.Material = Enum.Material.Slate
+			rock.CFrame = origin + cornerOff + rockOffsets[r]
+			rock.Parent = folder
+		end
+	end
+
+	-- ── Helipad marking (near slot index 5, the Helipad building) ───────────
+	local helipadCF = itemCFrame(origin, 4) -- slot 4 = order 5 (Helipad)
+	local helipadBase = Instance.new("Part")
+	helipadBase.Name = "HelipadMarking"
+	helipadBase.Anchored = true
+	helipadBase.Size = Vector3.new(20, 0.2, 20)
+	helipadBase.BrickColor = BrickColor.new("Medium stone grey")
+	helipadBase.Material = Enum.Material.Concrete
+	helipadBase.CFrame = helipadCF + Vector3.new(0, 0.1, 0)
+	helipadBase.Parent = folder
+
+	-- "H" made of two vertical bars and one horizontal bar (yellow)
+	local hBarV1 = Instance.new("Part")
+	hBarV1.Name = "HelipadH_V1"
+	hBarV1.Anchored = true
+	hBarV1.Size = Vector3.new(2, 0.15, 10)
+	hBarV1.BrickColor = BrickColor.new("Bright yellow")
+	hBarV1.Material = Enum.Material.SmoothPlastic
+	hBarV1.CFrame = helipadCF + Vector3.new(-3, 0.25, 0)
+	hBarV1.Parent = folder
+
+	local hBarV2 = Instance.new("Part")
+	hBarV2.Name = "HelipadH_V2"
+	hBarV2.Anchored = true
+	hBarV2.Size = Vector3.new(2, 0.15, 10)
+	hBarV2.BrickColor = BrickColor.new("Bright yellow")
+	hBarV2.Material = Enum.Material.SmoothPlastic
+	hBarV2.CFrame = helipadCF + Vector3.new(3, 0.25, 0)
+	hBarV2.Parent = folder
+
+	local hBarH = Instance.new("Part")
+	hBarH.Name = "HelipadH_H"
+	hBarH.Anchored = true
+	hBarH.Size = Vector3.new(8, 0.15, 2)
+	hBarH.BrickColor = BrickColor.new("Bright yellow")
+	hBarH.Material = Enum.Material.SmoothPlastic
+	hBarH.CFrame = helipadCF + Vector3.new(0, 0.25, 0)
+	hBarH.Parent = folder
+
+	-- ── SpawnLocation ───────────────────────────────────────────────────────
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "TycoonSpawn"
 	spawn.Anchored = true
@@ -304,9 +544,6 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
 	-- Invisible walls around the platform edges to prevent falling off
 	local wallHeight = 20
 	local wallThickness = 2
-	local platWidth = 250
-	local platDepth = 400
-	local platCenterZ = 150
 	local walls = {
 		{ offset = Vector3.new(0, wallHeight / 2, platCenterZ - platDepth / 2), size = Vector3.new(platWidth, wallHeight, wallThickness) }, -- -Z
 		{ offset = Vector3.new(0, wallHeight / 2, platCenterZ + platDepth / 2), size = Vector3.new(platWidth, wallHeight, wallThickness) }, -- +Z
@@ -342,9 +579,9 @@ function TycoonBuilder.SpawnPurchaseButtons(padNumber: number, unlockedItems: { 
 	local folder = getOrCreatePadFolder(padNumber)
 	local origin = padOriginCFrame(padNumber)
 
-	-- Remove old buttons
+	-- Remove old buttons and their beacons
 	for _, child in folder:GetChildren() do
-		if child.Name:sub(1, 15) == "PurchaseButton_" then
+		if child.Name:sub(1, 15) == "PurchaseButton_" or child.Name == "Beacon" then
 			child:Destroy()
 		end
 	end
