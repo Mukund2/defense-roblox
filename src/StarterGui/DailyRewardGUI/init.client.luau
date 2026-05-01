@@ -250,6 +250,10 @@ local function hide()
 end
 
 local function show(streakDay: number, _rewardAmount: number, canClaim: boolean)
+	-- Don't show the panel if there's nothing to claim
+	if not canClaim then
+		return
+	end
 	canClaimNow = canClaim
 
 	-- Update day boxes
