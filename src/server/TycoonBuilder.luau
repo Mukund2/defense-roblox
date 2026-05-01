@@ -624,7 +624,7 @@ local function spawnBuildingModel(folder: Folder, item: any, cf: CFrame): Model
 	-- Start building behavior (radar spin, SAM scan, lights, etc.)
 	local padNumStr = folder.Name:match("Tycoon_Pad_(%d+)")
 	local padNum = padNumStr and tonumber(padNumStr) or 1
-	BuildingBehaviors.StartBehavior(padNum, model, item.modelName)
+	BuildingBehaviors.StartBehavior(padNum, model, item.modelName, item.incomePerSecond)
 
 	return model
 end

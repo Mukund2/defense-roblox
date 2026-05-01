@@ -285,15 +285,88 @@ local function addAmbientLight(model: Model): CleanupFn
 	end
 end
 
+-- ── Income visualization: floating $ signs ──────────────────────────────────
+-- Every building periodically spawns a green "$" BillboardGui that floats
+-- upward and fades out, showing it's actively generating income.
+
+local function incomeVisualization(model: Model, incomePerSecond: number): CleanupFn
+	local primary = model.PrimaryPart
+	if not primary then
+		return function() end
+	end
+
+	local running = true
+	-- Spawn a $ sign every few seconds (faster for higher income buildings)
+	local interval = math.clamp(5 / math.max(incomePerSecond, 1), 1, 5)
+
+	task.spawn(function()
+		task.wait(math.random() * interval) -- stagger so they don't all sync
+		while running do
+			-- Create a floating $ Part with BillboardGui
+			local floater = Instance.new("Part")
+			floater.Size = Vector3.new(0.5, 0.5, 0.5)
+			floater.Transparency = 1
+			floater.Anchored = true
+			floater.CanCollide = false
+			floater.CastShadow = false
+			-- Start from ground level in front of the building so player sees it
+			floater.Position = primary.Position + Vector3.new(
+				(math.random() - 0.5) * 8,
+				1,
+				-primary.Size.Z / 2 - 3 + (math.random() - 0.5) * 4
+			)
+			floater.Parent = workspace
+
+			local gui = Instance.new("BillboardGui")
+			gui.Size = UDim2.new(0, 80, 0, 40)
+			gui.AlwaysOnTop = true
+			gui.Parent = floater
+
+			local label = Instance.new("TextLabel")
+			label.Size = UDim2.new(1, 0, 1, 0)
+			label.BackgroundTransparency = 1
+			label.Text = "+$" .. tostring(incomePerSecond)
+			label.TextColor3 = Color3.fromRGB(80, 255, 80)
+			label.TextStrokeTransparency = 0
+			label.TextStrokeColor3 = Color3.fromRGB(0, 40, 0)
+			label.TextScaled = true
+			label.Font = Enum.Font.GothamBold
+			label.Parent = gui
+
+			-- Float upward and fade
+			local startPos = floater.Position
+			local startTime = os.clock()
+			local duration = 2
+
+			task.spawn(function()
+				while os.clock() - startTime < duration do
+					local t = (os.clock() - startTime) / duration
+					floater.Position = startPos + Vector3.new(0, t * 14, 0)
+					label.TextTransparency = t
+					label.TextStrokeTransparency = 0.3 + t * 0.7
+					task.wait()
+				end
+				floater:Destroy()
+			end)
+
+			task.wait(interval)
+		end
+	end)
+
+	return function()
+		running = false
+	end
+end
+
 -- ── Public API ──────────────────────────────────────────────────────────────
 
-function BuildingBehaviors.StartBehavior(padNumber: number, model: Model, buildingName: string)
+function BuildingBehaviors.StartBehavior(padNumber: number, model: Model, buildingName: string, incomePerSecond: number?)
 	if not activeBehaviors[padNumber] then
 		activeBehaviors[padNumber] = {}
 	end
 
+	-- Specific building behavior
 	local cleanup: CleanupFn
-
 	if buildingName == "RadarStation" then
 		cleanup = radarBehavior(model)
 	elseif buildingName == "SAMSite" then
@@ -305,11 +378,16 @@ function BuildingBehaviors.StartBehavior(padNumber: number, model: Model, buildi
 	elseif buildingName == "SpaceCommand" then
 		cleanup = spaceCommandBehavior(model)
 	else
-		-- All buildings get ambient light
 		cleanup = addAmbientLight(model)
 	end
-
 	table.insert(activeBehaviors[padNumber], cleanup)
+
+	-- ALL buildings get income visualization (floating $ signs)
+	local income = incomePerSecond or 0
+	if income > 0 then
+		local incomeCleanup = incomeVisualization(model, income)
+		table.insert(activeBehaviors[padNumber], incomeCleanup)
+	end
 end
 
 function BuildingBehaviors.StopAllBehaviors(padNumber: number)
