@@ -230,6 +230,7 @@ local function setupTycoonForPlayer(player: Player, padNumber: number)
 		end
 		local humanoid = newCharacter:WaitForChild("Humanoid", 10) :: Humanoid?
 		if humanoid then
+			humanoid.WalkSpeed = 32
 			task.spawn(function()
 				while humanoid and humanoid.Health > 0 do
 					if hrp and hrp.Position.Y < -50 then
@@ -422,6 +423,10 @@ local function onPlayerAdded(player: Player)
 	local rootPart = character:WaitForChild("HumanoidRootPart", 10) :: BasePart?
 	if rootPart then
 		rootPart.CFrame = spawnCF
+	end
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.WalkSpeed = 32
 	end
 
 	-- Also handle respawns before claiming -- spawn at center

@@ -789,9 +789,9 @@ end
 
 local function spawnCanyonWalls(folder: Folder)
 	local RING_RADIUS = 500
-	local SEGMENT_COUNT = 24
+	local SEGMENT_COUNT = 48
 	local WALL_HEIGHT = 60
-	local WALL_THICKNESS = 40
+	local WALL_THICKNESS = 50
 
 	local canyonColors = {
 		BrickColor.new("Reddish brown"),
@@ -815,7 +815,7 @@ local function spawnCanyonWalls(folder: Folder)
 		wall.Name = "CanyonWall_" .. tostring(i)
 		wall.Anchored = true
 		wall.CanCollide = true
-		wall.Size = Vector3.new(arcLength + 5, segmentHeight, WALL_THICKNESS)
+		wall.Size = Vector3.new(arcLength + 15, segmentHeight, WALL_THICKNESS)
 		wall.CFrame = CFrame.new(Vector3.new(x, segmentHeight / 2, z)) * CFrame.Angles(0, angle + math.rad(90), 0)
 		wall.BrickColor = color
 		wall.Material = Enum.Material.Slate
@@ -1023,53 +1023,7 @@ local function createSharedWorld()
 		arrowLabel.Parent = arrowGui
 	end
 
-	-- ── Decorative elements: flag poles ──────────────────────────────────
-	local flagPositions = {
-		Vector3.new(-15, 0, -15),
-		Vector3.new(15, 0, -15),
-		Vector3.new(-15, 0, 15),
-		Vector3.new(15, 0, 15),
-	}
-
-	for i, pos in ipairs(flagPositions) do
-		local pole = Instance.new("Part")
-		pole.Name = "FlagPole_" .. tostring(i)
-		pole.Anchored = true
-		pole.CanCollide = true
-		pole.Size = Vector3.new(0.5, 18, 0.5)
-		pole.CFrame = CFrame.new(pos + Vector3.new(0, 9, 0))
-		pole.BrickColor = BrickColor.new("Medium stone grey")
-		pole.Material = Enum.Material.Metal
-		pole.Parent = sharedFolder
-
-		-- Flag (small rectangle at top)
-		local flag = Instance.new("Part")
-		flag.Name = "Flag_" .. tostring(i)
-		flag.Anchored = true
-		flag.CanCollide = false
-		flag.Size = Vector3.new(4, 2.5, 0.2)
-		flag.CFrame = CFrame.new(pos + Vector3.new(2.5, 17, 0))
-		flag.BrickColor = BrickColor.new("Bright red")
-		flag.Material = Enum.Material.Fabric
-		flag.Parent = sharedFolder
-	end
-
-	-- ── Decorative sandbag barriers around spawn ────────────────────────
-	local sandbagAngles = { 0, math.rad(90), math.rad(180), math.rad(270) }
-	for i, angle in ipairs(sandbagAngles) do
-		local x = math.cos(angle) * 35
-		local z = math.sin(angle) * 35
-
-		local sandbag = Instance.new("Part")
-		sandbag.Name = "Sandbags_" .. tostring(i)
-		sandbag.Anchored = true
-		sandbag.CanCollide = true
-		sandbag.Size = Vector3.new(10, 3, 3)
-		sandbag.CFrame = CFrame.new(Vector3.new(x, 1.5, z)) * CFrame.Angles(0, angle, 0)
-		sandbag.BrickColor = BrickColor.new("Brick yellow")
-		sandbag.Material = Enum.Material.Fabric
-		sandbag.Parent = sharedFolder
-	end
+	-- (flags and sandbags removed — cluttered the spawn area)
 
 	-- ── Roads connecting center to each base pad ────────────────────────
 	for i, padPos in ipairs(PAD_POSITIONS) do
