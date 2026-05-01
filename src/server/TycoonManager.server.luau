@@ -12,6 +12,8 @@ local UnitManager = require(script.Parent.UnitManager) :: any
 local LeaderboardManager = require(script.Parent.LeaderboardManager) :: any
 local DailyRewardManager = require(script.Parent.DailyRewardManager) :: any
 local QuestManager = require(script.Parent.QuestManager) :: any
+local WeaponManager = require(script.Parent.WeaponManager) :: any
+local VehicleManager = require(script.Parent.VehicleManager) :: any
 
 -- ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -39,7 +41,18 @@ local padInUse: { [number]: boolean } = {
 }
 
 local MAX_PADS = 4
-local PAD_SPACING = 500
+
+-- Must match TycoonBuilder's PAD_POSITIONS (circular layout)
+local PAD_POSITIONS = {
+	Vector3.new(0, 0, 300),    -- North
+	Vector3.new(300, 0, 0),    -- East
+	Vector3.new(0, 0, -300),   -- South
+	Vector3.new(-300, 0, 0),   -- West
+}
+
+local function padOrigin(padNumber: number): Vector3
+	return PAD_POSITIONS[padNumber] or Vector3.new(0, 0, 0)
+end
 
 -- Cash collector debounce per player (tick of last collection).
 local lastCollectTime: { [Player]: number } = {}
@@ -197,8 +210,8 @@ local function setupTycoonForPlayer(player: Player, padNumber: number)
 	TycoonBuilder.SetupTycoonPad(padNumber, player)
 
 	-- Teleport the player to their claimed pad
-	local padOrigin = Vector3.new((padNumber - 1) * PAD_SPACING, 0, 0)
-	local padSpawnCF = CFrame.new(padOrigin + Vector3.new(0, 5, 10))
+	local padPos = padOrigin(padNumber)
+	local padSpawnCF = CFrame.new(padPos + Vector3.new(0, 5, 10))
 
 	local character = player.Character or player.CharacterAdded:Wait()
 	local rootPart = character:WaitForChild("HumanoidRootPart", 10) :: BasePart?
@@ -231,7 +244,7 @@ local function setupTycoonForPlayer(player: Player, padNumber: number)
 	end
 
 	-- Register the pad with UnitManager so it knows the world-space center.
-	local padCenter = CFrame.new(padOrigin)
+	local padCenter = CFrame.new(padPos)
 	UnitManager.RegisterPad(padNumber, player, padCenter)
 
 	-- Re-spawn all previously unlocked buildings (skip CommandCenter -- already placed by SetupTycoonPad)
@@ -248,6 +261,17 @@ local function setupTycoonForPlayer(player: Player, padNumber: number)
 			local unitSpec = require(ReplicatedStorage.UnitConfig).ByTier[item.order]
 			if unitSpec then
 				UnitManager.SpawnUnit(padNumber, unitSpec.name)
+			end
+		end
+	end
+
+	-- Re-spawn drivable vehicles for previously unlocked vehicle buildings.
+	for _, itemName in state.unlockedItems do
+		local vehicleType = VehicleManager.GetBuildingVehicleType(itemName)
+		if vehicleType then
+			local buildingPos = TycoonBuilder.GetBuildingWorldPosition(padNumber, itemName)
+			if buildingPos then
+				VehicleManager.SpawnVehicle(player, vehicleType, buildingPos + Vector3.new(15, 0, 0))
 			end
 		end
 	end
@@ -272,6 +296,10 @@ local function setupTycoonForPlayer(player: Player, padNumber: number)
 			_G.CombatAPI.RegisterBase(player, padNumber, state.unlockedItems)
 		end
 	end)
+
+	-- Give the player their weapons (default + any unlocked by buildings)
+	WeaponManager.GiveDefaultWeapon(player)
+	WeaponManager.UpdateWeapons(player, state.unlockedItems)
 
 	-- Daily rewards: check if player can claim
 	DailyRewardManager.CheckAndShowReward(player, data)
@@ -319,11 +347,11 @@ local function createClaimPadsForPlayer(player: Player)
 		end
 
 		-- Create claim pad via TycoonBuilder if available, otherwise build one here.
-		local padOrigin = Vector3.new((i - 1) * PAD_SPACING, 0, 0)
+		local padPos = padOrigin(i)
 		local claimPart = Instance.new("Part")
 		claimPart.Name = "ClaimPad_" .. tostring(i)
 		claimPart.Size = Vector3.new(20, 2, 20)
-		claimPart.Position = padOrigin + Vector3.new(0, 1, 0)
+		claimPart.Position = padPos + Vector3.new(0, 1, 0)
 		claimPart.Anchored = true
 		claimPart.CanCollide = true
 		claimPart.BrickColor = BrickColor.new("Lime green")
@@ -463,11 +491,13 @@ local function onPlayerRemoving(player: Player)
 		_G.CombatAPI.UnregisterBase(player)
 	end
 
-	-- Clean up daily reward and quest state
+	-- Clean up daily reward, quest, and weapon state
 	DailyRewardManager.OnPlayerRemoving(player)
 	QuestManager.OnPlayerRemoving(player)
+	WeaponManager.OnPlayerRemoving(player)
 
-	-- Clean up units and the world
+	-- Clean up vehicles, units, and the world
+	VehicleManager.DespawnAllVehicles(player)
 	UnitManager.DespawnAllUnits(state.pad)
 	TycoonBuilder.CleanupTycoon(state.pad)
 
@@ -536,6 +566,20 @@ local function onPurchaseRequest(player: Player, itemName: string)
 	if unitSpec then
 		UnitManager.SpawnUnit(state.pad, unitSpec.name)
 	end
+
+	-- Spawn a drivable vehicle if this building unlocks one.
+	local vehicleType = VehicleManager.GetBuildingVehicleType(itemName)
+	if vehicleType then
+		local buildingPos = TycoonBuilder.GetBuildingWorldPosition(state.pad, itemName)
+		if buildingPos then
+			-- Spawn the vehicle offset to the side of the building
+			local spawnPos = buildingPos + Vector3.new(15, 0, 0)
+			VehicleManager.SpawnVehicle(player, vehicleType, spawnPos)
+		end
+	end
+
+	-- Give any new weapons unlocked by this building
+	WeaponManager.UpdateWeapons(player, state.unlockedItems)
 
 	-- Update leaderboard
 	LeaderboardManager.UpdateCash(player, state.balance)

@@ -1387,6 +1387,16 @@ function TycoonBuilder.CreateCashCollector(padNumber: number)
 	end)
 end
 
+--- Returns the world position of a building for a given pad.
+function TycoonBuilder.GetBuildingWorldPosition(padNumber: number, buildingName: string): Vector3?
+	local pos = BUILDING_POSITIONS[buildingName]
+	if not pos then
+		return nil
+	end
+	local origin = padOriginCFrame(padNumber)
+	return (origin + pos).Position
+end
+
 --- Destroy all parts belonging to a tycoon pad.
 function TycoonBuilder.CleanupTycoon(padNumber: number)
 	-- Stop all building behavior loops first

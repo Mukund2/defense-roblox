@@ -74,6 +74,20 @@ export type RemotesType = {
 	CollectCash: RemoteEvent, -- Server tells client cash was collected (for feedback).
 	--   args: amount: number
 
+	-- Combat FPS
+	ShootPlayer: RemoteEvent, -- Client tells server they shot at a position.
+	--   args: hitPosition: Vector3, targetPart: string?
+	KillFeed: RemoteEvent, -- Server tells all clients about a kill.
+	--   args: killerName: string, victimName: string
+
+	-- Vehicles
+	SpawnVehicle: RemoteEvent, -- Client requests vehicle spawn.
+	--   args: vehicleType: string
+	VehicleShoot: RemoteEvent, -- Client fires vehicle weapon.
+	--   args: vehicleType: string, targetPosition: Vector3
+	VehiclePitch: RemoteEvent, -- Client sends pitch input for jets.
+	--   args: pitch: number (-1, 0, or 1)
+
 	-- Client → Server (with response)
 	GetPlayerData: RemoteFunction, -- Client requests its full save data snapshot.
 	--   returns: { money: number, income: number, unlockedItems: {string} }
@@ -154,6 +168,13 @@ local Remotes: RemotesType = table.freeze({
 	-- Cash Collector
 	UpdatePendingCash = getOrCreate(folder, "RemoteEvent", "UpdatePendingCash") :: RemoteEvent,
 	CollectCash = getOrCreate(folder, "RemoteEvent", "CollectCash") :: RemoteEvent,
+	-- Combat FPS
+	ShootPlayer = getOrCreate(folder, "RemoteEvent", "ShootPlayer") :: RemoteEvent,
+	KillFeed = getOrCreate(folder, "RemoteEvent", "KillFeed") :: RemoteEvent,
+	-- Vehicles
+	SpawnVehicle = getOrCreate(folder, "RemoteEvent", "SpawnVehicle") :: RemoteEvent,
+	VehicleShoot = getOrCreate(folder, "RemoteEvent", "VehicleShoot") :: RemoteEvent,
+	VehiclePitch = getOrCreate(folder, "RemoteEvent", "VehiclePitch") :: RemoteEvent,
 })
 
 return Remotes
