@@ -17,10 +17,10 @@ local TYCOON_FOLDER_PREFIX = "Tycoon_Pad_"
 
 -- Circular layout: 4 bases at compass points around the central spawn
 local PAD_POSITIONS = {
-	Vector3.new(0, 0, 200),    -- North
-	Vector3.new(200, 0, 0),    -- East
-	Vector3.new(0, 0, -200),   -- South
-	Vector3.new(-200, 0, 0),   -- West
+	Vector3.new(0, 0, 400),    -- North
+	Vector3.new(400, 0, 0),    -- East
+	Vector3.new(0, 0, -400),   -- South
+	Vector3.new(-400, 0, 0),   -- West
 }
 
 -- Button styling (flat circular pads)
@@ -801,7 +801,7 @@ local function spawnCanyonWalls(folder: Folder)
 	-- Place rocky hills in a rough ring at radius 400-550
 	for i = 1, 60 do
 		local angle = (i / 60) * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
-		local radius = 550 + rng:NextNumber(-50, 80)
+		local radius = 700 + rng:NextNumber(-50, 80)
 		local x = math.cos(angle) * radius
 		local z = math.sin(angle) * radius
 
@@ -822,41 +822,6 @@ local function spawnCanyonWalls(folder: Folder)
 		rock.Parent = folder
 	end
 
-	-- Scatter some hills/boulders in the midfield for cover and visual interest
-	local hillDefs = {
-		{ pos = Vector3.new(150, 0, 150),  height = 18, width = 35 },
-		{ pos = Vector3.new(-150, 0, -150), height = 22, width = 30 },
-		{ pos = Vector3.new(180, 0, -120),  height = 14, width = 25 },
-		{ pos = Vector3.new(-180, 0, 120),  height = 20, width = 40 },
-		{ pos = Vector3.new(100, 0, -200),  height = 12, width = 28 },
-		{ pos = Vector3.new(-100, 0, 200),  height = 16, width = 32 },
-		{ pos = Vector3.new(200, 0, 200),   height = 10, width = 20 },
-		{ pos = Vector3.new(-200, 0, -200), height = 15, width = 22 },
-	}
-
-	for i, def in ipairs(hillDefs) do
-		local color = canyonColors[((i - 1) % #canyonColors) + 1]
-		local hill = Instance.new("Part")
-		hill.Name = "Hill_" .. tostring(i)
-		hill.Anchored = true
-		hill.CanCollide = true
-		hill.Size = Vector3.new(def.width, def.height, def.width * 0.8)
-		hill.CFrame = CFrame.new(def.pos + Vector3.new(0, def.height / 2 - 2, 0))
-		hill.BrickColor = color
-		hill.Material = Enum.Material.Slate
-		hill.Parent = folder
-
-		-- Grassy top
-		local top = Instance.new("Part")
-		top.Name = "HillTop_" .. tostring(i)
-		top.Anchored = true
-		top.CanCollide = true
-		top.Size = Vector3.new(def.width + 4, 2, def.width * 0.8 + 4)
-		top.CFrame = CFrame.new(def.pos + Vector3.new(0, def.height - 1, 0))
-		top.BrickColor = BrickColor.new("Bright green")
-		top.Material = Enum.Material.Grass
-		top.Parent = folder
-	end
 end
 
 -- ── Public API ────────────────────────────────────────────────────────────────
@@ -896,7 +861,7 @@ local function createSharedWorld()
 
 	-- ── Desert ground plane ──────────────────────────────────────────────
 	-- Large circular-ish ground covering the entire play area
-	local groundSize = 1200
+	local groundSize = 1600
 	local ground = Instance.new("Part")
 	ground.Name = "WorldGround"
 	ground.Anchored = true
