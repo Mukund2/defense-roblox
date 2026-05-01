@@ -17,14 +17,10 @@
 --]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
 
 local UnitConfig = require(ReplicatedStorage:WaitForChild("UnitConfig")) :: any
 local UnitBehaviors = require(script.Parent:WaitForChild("UnitBehaviors")) :: any
 local EffectsManager = require(script.Parent:WaitForChild("EffectsManager")) :: any
-
--- Folder containing real models for units (inserted via Creator Store)
-local UnitModels = ServerStorage:FindFirstChild("UnitModels")
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Types
@@ -245,85 +241,11 @@ function UnitManager.SpawnUnit(padNumber: number, unitName: string)
 		}
 	end
 
-	-- Try to use a real model from ServerStorage.UnitModels, fall back to placeholder Part.
+	-- Build placeholder Part for this unit and position it.
 	local spawnCF = spawnCFrameFor(center, unitSpec, padNumber)
-	local part: BasePart
-
-	local realModel = UnitModels and UnitModels:FindFirstChild(unitName)
-	if realModel and realModel:IsA("Model") then
-		local clone = realModel:Clone()
-		clone.Name = unitName
-
-		-- Anchor all parts
-		for _, desc in clone:GetDescendants() do
-			if desc:IsA("BasePart") then
-				desc.Anchored = true
-				desc.CanCollide = false
-			end
-		end
-
-		-- Ensure PrimaryPart
-		if not clone.PrimaryPart then
-			for _, desc in clone:GetDescendants() do
-				if desc:IsA("BasePart") then
-					clone.PrimaryPart = desc
-					break
-				end
-			end
-		end
-
-		-- Position: pivot to target first, then shift up so bottom sits at ground
-		if clone.PrimaryPart then
-			clone:PivotTo(spawnCF)
-
-			local minY = math.huge
-			for _, desc in clone:GetDescendants() do
-				if desc:IsA("BasePart") then
-					local partBottom = desc.Position.Y - desc.Size.Y / 2
-					if partBottom < minY then
-						minY = partBottom
-					end
-				end
-			end
-
-			local shiftUp = spawnCF.Position.Y - minY
-			if math.abs(shiftUp) > 0.1 then
-				clone:PivotTo(clone:GetPivot() + Vector3.new(0, shiftUp, 0))
-			end
-		end
-
-		-- Add name tag
-		local _, modelSize = clone:GetBoundingBox()
-		local billboard = Instance.new("BillboardGui")
-		billboard.Name = "NameTag"
-		billboard.AlwaysOnTop = false
-		billboard.Size = UDim2.new(0, 120, 0, 30)
-		billboard.StudsOffset = Vector3.new(0, modelSize.Y + 2, 0)
-		if clone.PrimaryPart then
-			billboard.Adornee = clone.PrimaryPart
-			billboard.Parent = clone.PrimaryPart
-		end
-		local label = Instance.new("TextLabel")
-		label.Size = UDim2.new(1, 0, 1, 0)
-		label.BackgroundTransparency = 1
-		label.Text = unitSpec.displayName
-		label.TextColor3 = Color3.fromRGB(255, 255, 255)
-		label.TextStrokeTransparency = 0.3
-		label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-		label.TextScaled = true
-		label.Font = Enum.Font.GothamBold
-		label.Parent = billboard
-
-		clone.Parent = workspace
-
-		-- For AI behavior, use the PrimaryPart as the movable part
-		part = clone.PrimaryPart :: BasePart
-	else
-		-- Fallback: placeholder Part
-		part = buildPart(unitName, spec, unitSpec.displayName)
-		part.CFrame = spawnCF
-		part.Parent = workspace
-	end
+	local part: BasePart = buildPart(unitName, spec, unitSpec.displayName)
+	part.CFrame = spawnCF
+	part.Parent = workspace
 
 	-- Start the AI behavior loop.
 	local cleanup = startBehavior(part, unitSpec, center)
