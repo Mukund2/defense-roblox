@@ -44,10 +44,10 @@ local MAX_PADS = 4
 
 -- Must match TycoonBuilder's PAD_POSITIONS (circular layout)
 local PAD_POSITIONS = {
-	Vector3.new(0, 0, 100),    -- North
-	Vector3.new(100, 0, 0),    -- East
-	Vector3.new(0, 0, -100),   -- South
-	Vector3.new(-100, 0, 0),   -- West
+	Vector3.new(0, 0, 200),    -- North
+	Vector3.new(200, 0, 0),    -- East
+	Vector3.new(0, 0, -200),   -- South
+	Vector3.new(-200, 0, 0),   -- West
 }
 
 local function padOrigin(padNumber: number): Vector3

@@ -17,10 +17,10 @@ local TYCOON_FOLDER_PREFIX = "Tycoon_Pad_"
 
 -- Circular layout: 4 bases at compass points around the central spawn
 local PAD_POSITIONS = {
-	Vector3.new(0, 0, 100),    -- North
-	Vector3.new(100, 0, 0),    -- East
-	Vector3.new(0, 0, -100),   -- South
-	Vector3.new(-100, 0, 0),   -- West
+	Vector3.new(0, 0, 200),    -- North
+	Vector3.new(200, 0, 0),    -- East
+	Vector3.new(0, 0, -200),   -- South
+	Vector3.new(-200, 0, 0),   -- West
 }
 
 -- Button styling (flat circular pads)
@@ -801,7 +801,7 @@ local function spawnCanyonWalls(folder: Folder)
 	-- Place rocky hills in a rough ring at radius 400-550
 	for i = 1, 60 do
 		local angle = (i / 60) * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
-		local radius = 450 + rng:NextNumber(-50, 80)
+		local radius = 550 + rng:NextNumber(-50, 80)
 		local x = math.cos(angle) * radius
 		local z = math.sin(angle) * radius
 
