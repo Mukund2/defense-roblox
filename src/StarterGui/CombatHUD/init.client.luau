@@ -70,6 +70,7 @@ HPFrame.Size = UDim2.new(0, 280, 0, 32)
 HPFrame.BackgroundColor3 = COLOR.BG_DARK
 HPFrame.BackgroundTransparency = 0.15
 HPFrame.BorderSizePixel = 0
+HPFrame.Visible = false
 HPFrame.Parent = ScreenGui
 applyCorner(HPFrame, 6)
 applyStroke(HPFrame, COLOR.STROKE_RED, 1)

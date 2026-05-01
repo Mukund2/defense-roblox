@@ -214,7 +214,7 @@ local function setupTycoonForPlayer(player: Player, padNumber: number)
 
 	-- Teleport the player to their claimed pad
 	local padPos = padOrigin(padNumber)
-	local padSpawnCF = CFrame.new(padPos + Vector3.new(0, 5, 10))
+	local padSpawnCF = CFrame.new(padPos + Vector3.new(0, 5, -15))
 
 	local character = player.Character or player.CharacterAdded:Wait()
 	local rootPart = character:WaitForChild("HumanoidRootPart", 10) :: BasePart?

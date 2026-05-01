@@ -897,45 +897,6 @@ local function createSharedWorld()
 	spawn.Neutral = true
 	spawn.Parent = sharedFolder
 
-	-- ── "MILITARY BASE TYCOON" sign on a tall pole ──────────────────────
-	local signPole = Instance.new("Part")
-	signPole.Name = "SignPole"
-	signPole.Anchored = true
-	signPole.CanCollide = true
-	signPole.Size = Vector3.new(2, 30, 2)
-	signPole.CFrame = CFrame.new(Vector3.new(0, 15, -30))
-	signPole.BrickColor = BrickColor.new("Dark stone grey")
-	signPole.Material = Enum.Material.Metal
-	signPole.Parent = sharedFolder
-
-	local signBoard = Instance.new("Part")
-	signBoard.Name = "SignBoard"
-	signBoard.Anchored = true
-	signBoard.CanCollide = false
-	signBoard.Size = Vector3.new(20, 6, 1)
-	signBoard.CFrame = CFrame.new(Vector3.new(0, 33, -30))
-	signBoard.BrickColor = BrickColor.new("Olive")
-	signBoard.Material = Enum.Material.Metal
-	signBoard.Parent = sharedFolder
-
-	local signGui = Instance.new("BillboardGui")
-	signGui.Name = "TitleGui"
-	signGui.Size = UDim2.new(0, 600, 0, 120)
-	signGui.StudsOffset = Vector3.new(0, 1, 0)
-	signGui.AlwaysOnTop = false
-	signGui.Parent = signBoard
-
-	local titleLabel = Instance.new("TextLabel")
-	titleLabel.Size = UDim2.new(1, 0, 1, 0)
-	titleLabel.BackgroundTransparency = 1
-	titleLabel.TextColor3 = Color3.fromRGB(255, 220, 50)
-	titleLabel.TextScaled = true
-	titleLabel.Font = Enum.Font.GothamBold
-	titleLabel.Text = "MILITARY BASE TYCOON"
-	titleLabel.TextStrokeTransparency = 0
-	titleLabel.TextStrokeColor3 = Color3.fromRGB(40, 30, 0)
-	titleLabel.Parent = signGui
-
 	-- ── Directional arrows on the ground pointing to each base ──────────
 	local arrowDirs = {
 		{ dir = Vector3.new(0, 0, 1),   label = "NORTH BASE" },
@@ -1164,7 +1125,7 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, player: Player)
 	spawn.Name = "TycoonSpawn"
 	spawn.Anchored = true
 	spawn.Size = Vector3.new(8, 1, 8)
-	spawn.CFrame = origin + Vector3.new(0, 0.5, 10)
+	spawn.CFrame = origin + Vector3.new(0, 0.5, -15)
 	spawn.Transparency = 1
 	spawn.CanCollide = false
 	spawn.TeamColor = BrickColor.new("Medium stone grey")
