@@ -285,70 +285,60 @@ local function addAmbientLight(model: Model): CleanupFn
 	end
 end
 
--- ── Income visualization: floating $ signs ──────────────────────────────────
--- Every building periodically spawns a green "$" BillboardGui that floats
--- upward and fades out, showing it's actively generating income.
+-- ── Income visualization: military supply dropper ───────────────────────────
+-- Every building periodically spawns a small military supply crate that
+-- drops and slides toward the cash collector area.
 
-local function incomeVisualization(model: Model, incomePerSecond: number): CleanupFn
+-- Dropper: spawn a small military supply crate that slides toward collector
+local function spawnDropperItem(building: Model, padNumber: number, incomePerSecond: number)
+	local primaryPart = building.PrimaryPart
+	if not primaryPart then return end
+
+	local dropItems = {"AmmoCrate", "FuelCan", "MedKit", "Rations"}
+	local dropColors = {
+		Color3.fromRGB(60, 80, 40),   -- olive
+		Color3.fromRGB(150, 50, 50),   -- red fuel
+		Color3.fromRGB(220, 220, 220), -- white medkit
+		Color3.fromRGB(120, 90, 50),   -- brown rations
+	}
+
+	local idx = math.random(1, #dropItems)
+	local crate = Instance.new("Part")
+	crate.Name = dropItems[idx]
+	crate.Size = Vector3.new(1.5, 1, 1.5)
+	crate.Color = dropColors[idx]
+	crate.Material = Enum.Material.SmoothPlastic
+	crate.Anchored = true
+	crate.CanCollide = false
+	crate.CFrame = primaryPart.CFrame * CFrame.new(0, primaryPart.Size.Y / 2 + 1, -3)
+	crate.Parent = workspace
+
+	-- Slide toward collector then disappear
+	local targetPos = crate.Position + Vector3.new(0, -2, -8)
+	local tween = TweenService:Create(crate, TweenInfo.new(2, Enum.EasingStyle.Linear), {
+		CFrame = CFrame.new(targetPos),
+		Transparency = 0.8,
+	})
+	tween:Play()
+	tween.Completed:Connect(function()
+		crate:Destroy()
+	end)
+end
+
+local function incomeVisualization(model: Model, incomePerSecond: number, padNumber: number): CleanupFn
 	local primary = model.PrimaryPart
 	if not primary then
 		return function() end
 	end
 
 	local running = true
-	-- Spawn a $ sign every few seconds (faster for higher income buildings)
-	local interval = math.clamp(5 / math.max(incomePerSecond, 1), 1, 5)
+	-- Spawn a dropper every few seconds (faster for higher income buildings)
+	local interval = math.clamp(8 / math.max(incomePerSecond, 1), 3, 5)
 
 	task.spawn(function()
 		task.wait(math.random() * interval) -- stagger so they don't all sync
 		while running do
-			-- Create a floating $ Part with BillboardGui
-			local floater = Instance.new("Part")
-			floater.Size = Vector3.new(0.5, 0.5, 0.5)
-			floater.Transparency = 1
-			floater.Anchored = true
-			floater.CanCollide = false
-			floater.CastShadow = false
-			-- Start from ground level in front of the building so player sees it
-			floater.Position = primary.Position + Vector3.new(
-				(math.random() - 0.5) * 8,
-				1,
-				-primary.Size.Z / 2 - 3 + (math.random() - 0.5) * 4
-			)
-			floater.Parent = workspace
-
-			local gui = Instance.new("BillboardGui")
-			gui.Size = UDim2.new(0, 80, 0, 40)
-			gui.AlwaysOnTop = true
-			gui.Parent = floater
-
-			local label = Instance.new("TextLabel")
-			label.Size = UDim2.new(1, 0, 1, 0)
-			label.BackgroundTransparency = 1
-			label.Text = "+$" .. tostring(incomePerSecond)
-			label.TextColor3 = Color3.fromRGB(80, 255, 80)
-			label.TextStrokeTransparency = 0
-			label.TextStrokeColor3 = Color3.fromRGB(0, 40, 0)
-			label.TextScaled = true
-			label.Font = Enum.Font.GothamBold
-			label.Parent = gui
-
-			-- Float upward and fade
-			local startPos = floater.Position
-			local startTime = os.clock()
-			local duration = 2
-
-			task.spawn(function()
-				while os.clock() - startTime < duration do
-					local t = (os.clock() - startTime) / duration
-					floater.Position = startPos + Vector3.new(0, t * 14, 0)
-					label.TextTransparency = t
-					label.TextStrokeTransparency = 0.3 + t * 0.7
-					task.wait()
-				end
-				floater:Destroy()
-			end)
-
+			spawnDropperItem(model, padNumber, incomePerSecond)
 			task.wait(interval)
 		end
 	end)
@@ -382,10 +372,10 @@ function BuildingBehaviors.StartBehavior(padNumber: number, model: Model, buildi
 	end
 	table.insert(activeBehaviors[padNumber], cleanup)
 
-	-- ALL buildings get income visualization (floating $ signs)
+	-- ALL buildings get income visualization (military supply dropper)
 	local income = incomePerSecond or 0
 	if income > 0 then
-		local incomeCleanup = incomeVisualization(model, income)
+		local incomeCleanup = incomeVisualization(model, income, padNumber)
 		table.insert(activeBehaviors[padNumber], incomeCleanup)
 	end
 end

@@ -864,8 +864,8 @@ local function spawnCanyonWalls(folder: Folder)
 		top.CanCollide = true
 		top.Size = Vector3.new(mesa.size.X + 6, 3, mesa.size.Z + 6)
 		top.CFrame = CFrame.new(mesa.pos + Vector3.new(0, mesa.size.Y + 1.5, 0))
-		top.BrickColor = BrickColor.new("Brick yellow")
-		top.Material = Enum.Material.Sand
+		top.BrickColor = BrickColor.new("Bright green")
+		top.Material = Enum.Material.Grass
 		top.Parent = folder
 	end
 end
@@ -883,6 +883,24 @@ local function createSharedWorld()
 	end
 	sharedWorldCreated = true
 
+	-- ── Bright sunny day lighting ──────────────────────────────────────
+	local Lighting = game:GetService("Lighting")
+	Lighting.Ambient = Color3.fromRGB(140, 140, 140)
+	Lighting.Brightness = 3
+	Lighting.ClockTime = 14 -- 2 PM sunny
+	Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
+	Lighting.FogEnd = 100000 -- effectively no fog
+	Lighting.FogStart = 100000
+	-- Remove any Atmosphere if present
+	local atmo = Lighting:FindFirstChildOfClass("Atmosphere")
+	if atmo then atmo:Destroy() end
+	-- Remove any BloomEffect or ColorCorrection that might be causing haze
+	for _, effect in Lighting:GetChildren() do
+		if effect:IsA("PostEffect") then
+			effect:Destroy()
+		end
+	end
+
 	local sharedFolder = Instance.new("Folder")
 	sharedFolder.Name = "SharedWorld"
 	sharedFolder.Parent = workspace
@@ -895,8 +913,8 @@ local function createSharedWorld()
 	ground.Anchored = true
 	ground.CanCollide = true
 	ground.Size = Vector3.new(groundSize, 4, groundSize)
-	ground.BrickColor = BrickColor.new("Brick yellow")
-	ground.Material = Enum.Material.Sand
+	ground.BrickColor = BrickColor.new("Bright green")
+	ground.Material = Enum.Material.Grass
 	ground.CFrame = CFrame.new(Vector3.new(0, -4, 0))
 	ground.Parent = sharedFolder
 
@@ -1329,7 +1347,7 @@ function TycoonBuilder.CreateCashCollector(padNumber: number)
 	collector.CanCollide = true
 	collector.Shape = Enum.PartType.Cylinder
 	-- Flat cylinder on the ground
-	collector.Size = Vector3.new(1, 12, 12)
+	collector.Size = Vector3.new(1, 5, 5)
 	collector.CFrame = (collectorCF + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, 0, math.rad(90))
 	collector.BrickColor = BrickColor.new("Gold")
 	collector.Material = Enum.Material.Neon
@@ -1344,14 +1362,14 @@ function TycoonBuilder.CreateCashCollector(padNumber: number)
 	-- PointLight for visibility
 	local glow = Instance.new("PointLight")
 	glow.Brightness = 2
-	glow.Range = 20
+	glow.Range = 10
 	glow.Color = Color3.fromRGB(255, 215, 0)
 	glow.Parent = collector
 
 	-- Particle emitter (subtle gold sparkle)
 	local particles = Instance.new("ParticleEmitter")
 	particles.Color = ColorSequence.new(Color3.fromRGB(255, 215, 0))
-	particles.Rate = 5
+	particles.Rate = 2
 	particles.Lifetime = NumberRange.new(1, 1.5)
 	particles.Speed = NumberRange.new(1, 3)
 	particles.SpreadAngle = Vector2.new(20, 20)
@@ -1369,7 +1387,7 @@ function TycoonBuilder.CreateCashCollector(padNumber: number)
 	-- BillboardGui showing the accumulated cash
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "CollectorGui"
-	billboard.Size = UDim2.new(0, 400, 0, 80)
+	billboard.Size = UDim2.new(0, 150, 0, 40)
 	billboard.StudsOffset = Vector3.new(0, 4, 0)
 	billboard.AlwaysOnTop = false
 	billboard.Parent = collector
@@ -1381,14 +1399,14 @@ function TycoonBuilder.CreateCashCollector(padNumber: number)
 	cashLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
 	cashLabel.TextScaled = true
 	cashLabel.Font = Enum.Font.GothamBold
-	cashLabel.Text = "$0 -- Touch to Collect"
+	cashLabel.Text = "$0"
 	cashLabel.TextStrokeTransparency = 0
 	cashLabel.TextStrokeColor3 = Color3.fromRGB(80, 60, 0)
 	cashLabel.Parent = billboard
 
 	-- Update the label whenever CashAmount changes
 	cashValue.Changed:Connect(function(newValue: number)
-		cashLabel.Text = "$" .. tostring(math.floor(newValue)) .. " -- Touch to Collect"
+		cashLabel.Text = "$" .. tostring(math.floor(newValue))
 	end)
 end
 

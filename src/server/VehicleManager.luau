@@ -403,6 +403,68 @@ local function buildVehicle(vehicleType: string, position: Vector3, owner: Playe
 	body.CFrame = CFrame.new(position + Vector3.new(0, def.bodySize.Y / 2 + 2, 0))
 	body.Parent = model
 
+	-- Vehicle-specific body details
+	if vehicleType == "Humvee" then
+		-- Cab/windshield
+		local cab = Instance.new("Part")
+		cab.Name = "Cab"
+		cab.Size = Vector3.new(def.bodySize.X - 0.5, 2, 3)
+		cab.Color = Color3.fromRGB(80, 110, 30)
+		cab.Material = Enum.Material.Metal
+		cab.Anchored = false
+		cab.CanCollide = false
+		cab.Massless = true
+		cab.CFrame = body.CFrame * CFrame.new(0, def.bodySize.Y / 2 + 1, -1)
+		cab.Parent = model
+		weld(body, cab)
+
+		-- Windshield
+		local windshield = Instance.new("Part")
+		windshield.Name = "Windshield"
+		windshield.Size = Vector3.new(def.bodySize.X - 1, 1.5, 0.2)
+		windshield.Color = Color3.fromRGB(150, 200, 255)
+		windshield.Material = Enum.Material.Glass
+		windshield.Transparency = 0.3
+		windshield.Anchored = false
+		windshield.CanCollide = false
+		windshield.Massless = true
+		windshield.CFrame = body.CFrame * CFrame.new(0, def.bodySize.Y / 2 + 1, -2.6)
+		windshield.Parent = model
+		weld(body, windshield)
+
+		-- Front bumper
+		local bumper = Instance.new("Part")
+		bumper.Name = "Bumper"
+		bumper.Size = Vector3.new(def.bodySize.X + 0.5, 1, 0.5)
+		bumper.Color = Color3.fromRGB(50, 50, 50)
+		bumper.Material = Enum.Material.Metal
+		bumper.Anchored = false
+		bumper.CanCollide = false
+		bumper.Massless = true
+		bumper.CFrame = body.CFrame * CFrame.new(0, -0.5, -def.bodySize.Z / 2 - 0.3)
+		bumper.Parent = model
+		weld(body, bumper)
+
+		-- Rear bed rails
+		local railL = Instance.new("Part")
+		railL.Name = "RailL"
+		railL.Size = Vector3.new(0.3, 1, 3)
+		railL.Color = Color3.fromRGB(80, 110, 30)
+		railL.Material = Enum.Material.Metal
+		railL.Anchored = false
+		railL.CanCollide = false
+		railL.Massless = true
+		railL.CFrame = body.CFrame * CFrame.new(-def.bodySize.X / 2 + 0.15, def.bodySize.Y / 2 + 0.5, 2)
+		railL.Parent = model
+		weld(body, railL)
+
+		local railR = railL:Clone()
+		railR.Name = "RailR"
+		railR.CFrame = body.CFrame * CFrame.new(def.bodySize.X / 2 - 0.15, def.bodySize.Y / 2 + 0.5, 2)
+		railR.Parent = model
+		weld(body, railR)
+	end
+
 	-- VehicleSeat
 	local seat = Instance.new("VehicleSeat")
 	seat.Name = "VehicleSeat"

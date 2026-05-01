@@ -257,16 +257,8 @@ local function setupTycoonForPlayer(player: Player, padNumber: number)
 		end
 	end
 
-	-- Re-spawn units for all previously unlocked items that have associated units.
-	for _, itemName in state.unlockedItems do
-		local item = TycoonConfig.Items[itemName]
-		if item then
-			local unitSpec = require(ReplicatedStorage.UnitConfig).ByTier[item.order]
-			if unitSpec then
-				UnitManager.SpawnUnit(padNumber, unitSpec.name)
-			end
-		end
-	end
+	-- Units disabled — placeholder rectangles wandering around look bad.
+	-- TODO: Replace with proper rigged soldier/vehicle models.
 
 	-- Re-spawn drivable vehicles for previously unlocked vehicle buildings.
 	for _, itemName in state.unlockedItems do
@@ -563,12 +555,6 @@ local function onPurchaseRequest(player: Player, itemName: string)
 
 	-- Update the world
 	TycoonBuilder.UnlockItem(state.pad, itemName, state.unlockedItems)
-
-	-- Spawn the associated unit if this item's order tier maps to one.
-	local unitSpec = require(ReplicatedStorage.UnitConfig).ByTier[item.order]
-	if unitSpec then
-		UnitManager.SpawnUnit(state.pad, unitSpec.name)
-	end
 
 	-- Spawn a drivable vehicle if this building unlocks one.
 	local vehicleType = VehicleManager.GetBuildingVehicleType(itemName)
