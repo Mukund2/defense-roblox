@@ -167,8 +167,8 @@ local function setupCashCollector(padNumber: number, player: Player)
 		return
 	end
 
-	-- Look for CashCollector part inside the tycoon folder (any depth).
-	local collector = tycoonFolder:FindFirstChild("CashCollector", true) :: BasePart?
+	-- Look for CashCollector part inside the tycoon folder.
+	local collector = tycoonFolder:FindFirstChild("CashCollector_" .. tostring(padNumber)) :: BasePart?
 	if not collector then
 		return
 	end

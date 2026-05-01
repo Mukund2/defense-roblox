@@ -24,8 +24,8 @@ local PAD_POSITIONS = {
 }
 
 -- Button styling (flat circular pads)
-local BUTTON_COLOR = BrickColor.new("Lime green")
-local BUTTON_MATERIAL = Enum.Material.Neon
+local BUTTON_COLOR = BrickColor.new("Medium green")
+local BUTTON_MATERIAL = Enum.Material.SmoothPlastic
 local BUTTON_DIAMETER = 10
 local BUTTON_HEIGHT = 1
 local BUTTON_HEIGHT_OFFSET = 0.5
@@ -322,9 +322,9 @@ local function buildBarracks(origin: CFrame): Model
 		BrickColor.new("Brick yellow"), Enum.Material.Concrete)
 	m.PrimaryPart = body
 	-- Triangular roof using two wedges
-	makeWedge(m, "RoofLeft", Vector3.new(24, 4, 6), origin * CFrame.new(-0, 12, -3) * CFrame.Angles(0, 0, 0),
+	makeWedge(m, "RoofLeft", Vector3.new(24, 3, 6), origin * CFrame.new(0, 10, -3) * CFrame.Angles(0, 0, 0),
 		BrickColor.new("Reddish brown"), Enum.Material.Wood)
-	makeWedge(m, "RoofRight", Vector3.new(24, 4, 6), origin * CFrame.new(0, 12, 3) * CFrame.Angles(0, math.rad(180), 0),
+	makeWedge(m, "RoofRight", Vector3.new(24, 3, 6), origin * CFrame.new(0, 10, 3) * CFrame.Angles(0, math.rad(180), 0),
 		BrickColor.new("Reddish brown"), Enum.Material.Wood)
 	-- Windows (small dark rectangles on front)
 	for i = -2, 2 do
@@ -744,15 +744,15 @@ local function spawnPurchaseButton(folder: Folder, item: any, cf: CFrame): Part
 
 	-- PointLight
 	local pointLight = Instance.new("PointLight")
-	pointLight.Brightness = 2
-	pointLight.Range = 25
+	pointLight.Brightness = 0.5
+	pointLight.Range = 8
 	pointLight.Color = Color3.fromRGB(80, 255, 80)
 	pointLight.Parent = button
 
 	-- Particle emitter
 	local particles = Instance.new("ParticleEmitter")
 	particles.Color = ColorSequence.new(Color3.fromRGB(80, 255, 80))
-	particles.Rate = 8
+	particles.Rate = 2
 	particles.Lifetime = NumberRange.new(1.5)
 	particles.Speed = NumberRange.new(3)
 	particles.SpreadAngle = Vector2.new(15, 15)
@@ -760,19 +760,6 @@ local function spawnPurchaseButton(folder: Folder, item: any, cf: CFrame): Part
 	particles.Size = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.5), NumberSequenceKeypoint.new(1, 0) })
 	particles.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
 	particles.Parent = button
-
-	-- Small arrow above button (no tall beacon)
-	local arrow = Instance.new("Part")
-	arrow.Name = "Beacon"
-	arrow.Anchored = true
-	arrow.CanCollide = false
-	arrow.Size = Vector3.new(1.5, 1.5, 1.5)
-	arrow.BrickColor = BrickColor.new("Lime green")
-	arrow.Material = Enum.Material.Neon
-	arrow.Transparency = 0.3
-	arrow.Shape = Enum.PartType.Ball
-	arrow.CFrame = buttonCF + Vector3.new(0, 6 + BUTTON_HEIGHT_OFFSET, 0)
-	arrow.Parent = folder
 
 	-- Tag for identification
 	button:SetAttribute("TycoonItem", item.modelName)
@@ -1046,17 +1033,6 @@ function TycoonBuilder.CreateClaimPad(padNumber: number)
 	claimLabel.TextStrokeColor3 = Color3.fromRGB(0, 40, 0)
 	claimLabel.Parent = billboard
 
-	-- Vertical beacon so it's visible from afar
-	local beacon = Instance.new("Part")
-	beacon.Name = "ClaimBeacon"
-	beacon.Anchored = true
-	beacon.CanCollide = false
-	beacon.Size = Vector3.new(3, 80, 3)
-	beacon.BrickColor = BrickColor.new("Lime green")
-	beacon.Material = Enum.Material.Neon
-	beacon.Transparency = 0.6
-	beacon.CFrame = origin + Vector3.new(0, 40, 0)
-	beacon.Parent = folder
 end
 
 --- Claims a pad for a player: removes the claim pad, spawns the initial base platform.
@@ -1114,10 +1090,10 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, player: Player)
 	base.Name = "BasePlatform"
 	base.Anchored = true
 	base.CanCollide = true
-	base.Size = Vector3.new(100, 2, 400)
+	base.Size = Vector3.new(120, 1, 120)
 	base.BrickColor = BrickColor.new("Medium stone grey")
 	base.Material = Enum.Material.Concrete
-	base.CFrame = origin + Vector3.new(0, -1, 200)
+	base.CFrame = origin + Vector3.new(0, -0.5, 60)
 	base.Parent = folder
 
 	-- ── SpawnLocation ─────────────────────────────────────────────────────
@@ -1209,10 +1185,10 @@ function TycoonBuilder.CreateCashCollector(padNumber: number)
 	collector.CanCollide = true
 	collector.Shape = Enum.PartType.Cylinder
 	-- Flat cylinder on the ground
-	collector.Size = Vector3.new(1, 5, 5)
+	collector.Size = Vector3.new(0.5, 4, 4)
 	collector.CFrame = (collectorCF + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	collector.BrickColor = BrickColor.new("Bright yellow")
-	collector.Material = Enum.Material.SmoothPlastic
+	collector.BrickColor = BrickColor.new("Cork")
+	collector.Material = Enum.Material.Wood
 	collector.Parent = folder
 
 	-- CashAmount NumberValue for TycoonManager to update
@@ -1221,36 +1197,11 @@ function TycoonBuilder.CreateCashCollector(padNumber: number)
 	cashValue.Value = 0
 	cashValue.Parent = collector
 
-	-- PointLight for visibility
-	local glow = Instance.new("PointLight")
-	glow.Brightness = 2
-	glow.Range = 10
-	glow.Color = Color3.fromRGB(255, 215, 0)
-	glow.Parent = collector
-
-	-- Particle emitter (subtle gold sparkle)
-	local particles = Instance.new("ParticleEmitter")
-	particles.Color = ColorSequence.new(Color3.fromRGB(255, 215, 0))
-	particles.Rate = 2
-	particles.Lifetime = NumberRange.new(1, 1.5)
-	particles.Speed = NumberRange.new(1, 3)
-	particles.SpreadAngle = Vector2.new(20, 20)
-	particles.EmissionDirection = Enum.NormalId.Top
-	particles.Size = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0.3),
-		NumberSequenceKeypoint.new(1, 0),
-	})
-	particles.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 0),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	particles.Parent = collector
-
 	-- BillboardGui showing the accumulated cash
 	local billboard = Instance.new("BillboardGui")
 	billboard.Name = "CollectorGui"
 	billboard.Size = UDim2.new(0, 150, 0, 40)
-	billboard.StudsOffset = Vector3.new(0, 4, 0)
+	billboard.StudsOffset = Vector3.new(0, 2.5, 0)
 	billboard.AlwaysOnTop = false
 	billboard.Parent = collector
 

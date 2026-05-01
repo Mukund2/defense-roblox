@@ -285,43 +285,43 @@ local function addAmbientLight(model: Model): CleanupFn
 	end
 end
 
--- ── Income visualization: military supply dropper ───────────────────────────
--- Every building periodically spawns a small military supply crate that
--- drops and slides toward the cash collector area.
+-- ── Income visualization: floating "+$X" text ──────────────────────────────
+-- Every building periodically shows a floating income text above it.
 
--- Dropper: spawn a small military supply crate that slides toward collector
-local function spawnDropperItem(building: Model, padNumber: number, incomePerSecond: number)
+local function showIncomeText(building: Model, amount: number)
 	local primaryPart = building.PrimaryPart
 	if not primaryPart then return end
 
-	local dropItems = {"AmmoCrate", "FuelCan", "MedKit", "Rations"}
-	local dropColors = {
-		Color3.fromRGB(60, 80, 40),   -- olive
-		Color3.fromRGB(150, 50, 50),   -- red fuel
-		Color3.fromRGB(220, 220, 220), -- white medkit
-		Color3.fromRGB(120, 90, 50),   -- brown rations
-	}
+	local billboard = Instance.new("BillboardGui")
+	billboard.Size = UDim2.new(0, 60, 0, 30)
+	billboard.StudsOffset = Vector3.new(0, primaryPart.Size.Y / 2 + 3, 0)
+	billboard.Adornee = primaryPart
+	billboard.Parent = primaryPart
+	billboard.AlwaysOnTop = false
 
-	local idx = math.random(1, #dropItems)
-	local crate = Instance.new("Part")
-	crate.Name = dropItems[idx]
-	crate.Size = Vector3.new(1.5, 1, 1.5)
-	crate.Color = dropColors[idx]
-	crate.Material = Enum.Material.SmoothPlastic
-	crate.Anchored = true
-	crate.CanCollide = false
-	crate.CFrame = primaryPart.CFrame * CFrame.new(0, primaryPart.Size.Y / 2 + 1, -3)
-	crate.Parent = workspace
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.fromScale(1, 1)
+	label.BackgroundTransparency = 1
+	label.Text = "+$" .. tostring(amount)
+	label.TextColor3 = Color3.fromRGB(80, 200, 80)
+	label.TextStrokeTransparency = 0.3
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.Parent = billboard
 
-	-- Slide toward collector then disappear
-	local targetPos = crate.Position + Vector3.new(0, -2, -8)
-	local tween = TweenService:Create(crate, TweenInfo.new(2, Enum.EasingStyle.Linear), {
-		CFrame = CFrame.new(targetPos),
-		Transparency = 0.8,
+	-- Float up and fade
+	local startOffset = billboard.StudsOffset
+	local tween = TweenService:Create(billboard, TweenInfo.new(1.5, Enum.EasingStyle.Linear), {
+		StudsOffset = startOffset + Vector3.new(0, 4, 0),
+	})
+	local fadeTween = TweenService:Create(label, TweenInfo.new(1.5, Enum.EasingStyle.Linear), {
+		TextTransparency = 1,
+		TextStrokeTransparency = 1,
 	})
 	tween:Play()
+	fadeTween:Play()
 	tween.Completed:Connect(function()
-		crate:Destroy()
+		billboard:Destroy()
 	end)
 end
 
@@ -332,13 +332,13 @@ local function incomeVisualization(model: Model, incomePerSecond: number, padNum
 	end
 
 	local running = true
-	-- Spawn a dropper every few seconds (faster for higher income buildings)
+	-- Show floating text every few seconds (faster for higher income buildings)
 	local interval = math.clamp(8 / math.max(incomePerSecond, 1), 3, 5)
 
 	task.spawn(function()
 		task.wait(math.random() * interval) -- stagger so they don't all sync
 		while running do
-			spawnDropperItem(model, padNumber, incomePerSecond)
+			showIncomeText(model, incomePerSecond)
 			task.wait(interval)
 		end
 	end)
@@ -372,7 +372,7 @@ function BuildingBehaviors.StartBehavior(padNumber: number, model: Model, buildi
 	end
 	table.insert(activeBehaviors[padNumber], cleanup)
 
-	-- ALL buildings get income visualization (military supply dropper)
+	-- ALL buildings get income visualization (floating +$X text)
 	local income = incomePerSecond or 0
 	if income > 0 then
 		local incomeCleanup = incomeVisualization(model, income, padNumber)
