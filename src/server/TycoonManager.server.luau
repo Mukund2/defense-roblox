@@ -95,6 +95,9 @@ local function fireUpdateMoney(player: Player, balance: number)
 	Remotes.UpdateMoney:FireClient(player, balance)
 end
 
+-- ── Create the world terrain immediately (ground, roads, canyon walls) ────────
+TycoonBuilder.CreateSharedWorld()
+
 -- ── Cash helper (shared by daily rewards, quests, and income) ─────────────────
 
 local function addCash(player: Player, amount: number)

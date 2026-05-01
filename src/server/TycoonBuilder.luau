@@ -1089,6 +1089,11 @@ local function createSharedWorld()
 	spawnCanyonWalls(sharedFolder)
 end
 
+--- Create the shared world (ground, roads, canyon walls) immediately on server start.
+function TycoonBuilder.CreateSharedWorld()
+	createSharedWorld()
+end
+
 -- ── Claim Pad System ──────────────────────────────────────────────────────────
 
 --- Creates the unclaimed glowing claim pad for a base slot.
