@@ -761,17 +761,18 @@ local function spawnPurchaseButton(folder: Folder, item: any, cf: CFrame): Part
 	particles.Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0), NumberSequenceKeypoint.new(1, 1) })
 	particles.Parent = button
 
-	-- Vertical beacon
-	local beacon = Instance.new("Part")
-	beacon.Name = "Beacon"
-	beacon.Anchored = true
-	beacon.CanCollide = false
-	beacon.Size = Vector3.new(2, 40, 2)
-	beacon.BrickColor = BrickColor.new("Lime green")
-	beacon.Material = Enum.Material.Neon
-	beacon.Transparency = 0.7
-	beacon.CFrame = buttonCF + Vector3.new(0, 20 + BUTTON_HEIGHT_OFFSET, 0)
-	beacon.Parent = folder
+	-- Small arrow above button (no tall beacon)
+	local arrow = Instance.new("Part")
+	arrow.Name = "Beacon"
+	arrow.Anchored = true
+	arrow.CanCollide = false
+	arrow.Size = Vector3.new(1.5, 1.5, 1.5)
+	arrow.BrickColor = BrickColor.new("Lime green")
+	arrow.Material = Enum.Material.Neon
+	arrow.Transparency = 0.3
+	arrow.Shape = Enum.PartType.Ball
+	arrow.CFrame = buttonCF + Vector3.new(0, 6 + BUTTON_HEIGHT_OFFSET, 0)
+	arrow.Parent = folder
 
 	-- Tag for identification
 	button:SetAttribute("TycoonItem", item.modelName)
@@ -1342,8 +1343,8 @@ function TycoonBuilder.CreateCashCollector(padNumber: number)
 	-- Flat cylinder on the ground
 	collector.Size = Vector3.new(1, 5, 5)
 	collector.CFrame = (collectorCF + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, 0, math.rad(90))
-	collector.BrickColor = BrickColor.new("Gold")
-	collector.Material = Enum.Material.Neon
+	collector.BrickColor = BrickColor.new("Bright yellow")
+	collector.Material = Enum.Material.SmoothPlastic
 	collector.Parent = folder
 
 	-- CashAmount NumberValue for TycoonManager to update
