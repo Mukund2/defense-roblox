@@ -17,10 +17,10 @@ local TYCOON_FOLDER_PREFIX = "Tycoon_Pad_"
 
 -- Circular layout: 4 bases at compass points around the central spawn
 local PAD_POSITIONS = {
-	Vector3.new(0, 0, 300),    -- North
-	Vector3.new(300, 0, 0),    -- East
-	Vector3.new(0, 0, -300),   -- South
-	Vector3.new(-300, 0, 0),   -- West
+	Vector3.new(0, 0, 100),    -- North
+	Vector3.new(100, 0, 0),    -- East
+	Vector3.new(0, 0, -100),   -- South
+	Vector3.new(-100, 0, 0),   -- West
 }
 
 -- Button styling (flat circular pads)

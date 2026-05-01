@@ -44,10 +44,10 @@ local MAX_PADS = 4
 
 -- Must match TycoonBuilder's PAD_POSITIONS (circular layout)
 local PAD_POSITIONS = {
-	Vector3.new(0, 0, 300),    -- North
-	Vector3.new(300, 0, 0),    -- East
-	Vector3.new(0, 0, -300),   -- South
-	Vector3.new(-300, 0, 0),   -- West
+	Vector3.new(0, 0, 100),    -- North
+	Vector3.new(100, 0, 0),    -- East
+	Vector3.new(0, 0, -100),   -- South
+	Vector3.new(-100, 0, 0),   -- West
 }
 
 local function padOrigin(padNumber: number): Vector3
@@ -405,51 +405,31 @@ end
 -- ── Player join ───────────────────────────────────────────────────────────────
 
 local function onPlayerAdded(player: Player)
-	-- Check if there are any free pads at all
 	local hasFree = getFreePad() ~= nil
 	if not hasFree then
-		warn("[TycoonManager] No free pads for " .. player.Name .. ". Server is full.")
-		player:Kick("The server is full — all tycoon pads are occupied. Please try again later.")
+		player:Kick("Server full — try again later.")
 		return
 	end
 
-	-- Setup leaderboard early so stats show while player picks a pad
 	LeaderboardManager.Setup(player)
 
-	-- Spawn player at center of map instead of a specific pad
 	local spawnCF = CFrame.new(Vector3.new(0, 5, 0))
-
 	local character = player.Character or player.CharacterAdded:Wait()
 	local rootPart = character:WaitForChild("HumanoidRootPart", 10) :: BasePart?
-	if rootPart then
-		rootPart.CFrame = spawnCF
-	end
+	if rootPart then rootPart.CFrame = spawnCF end
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	if humanoid then
-		humanoid.WalkSpeed = 32
-	end
+	if humanoid then humanoid.WalkSpeed = 32 end
 
-	-- Also handle respawns before claiming -- spawn at center
-	local preClaimConn: RBXScriptConnection? = nil
-	preClaimConn = player.CharacterAdded:Connect(function(newCharacter: Model)
-		-- If player has claimed a pad, this connection should be disconnected
-		if tycoons[player] then
-			if preClaimConn then
-				preClaimConn:Disconnect()
-				preClaimConn = nil
-			end
-			return
-		end
-		local hrp = newCharacter:WaitForChild("HumanoidRootPart", 10) :: BasePart?
-		if hrp then
-			hrp.CFrame = spawnCF
-		end
+	player.CharacterAdded:Connect(function(nc: Model)
+		if tycoons[player] then return end
+		local hrp = nc:WaitForChild("HumanoidRootPart", 10) :: BasePart?
+		if hrp then hrp.CFrame = spawnCF end
+		local hum = nc:WaitForChild("Humanoid", 10) :: Humanoid?
+		if hum then hum.WalkSpeed = 32 end
 	end)
 
-	-- Create claim pads for all unclaimed pads
 	createClaimPadsForPlayer(player)
-
-	print(string.format("[TycoonManager] %s joined — spawned at center, waiting for pad claim", player.Name))
+	print("[TycoonManager] " .. player.Name .. " joined — pick a base!")
 end
 
 -- ── Player leave ──────────────────────────────────────────────────────────────
