@@ -3,6 +3,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local TycoonConfig = require(ReplicatedStorage.TycoonConfig) :: any
+local BuildingBehaviors = require(script.Parent:WaitForChild("BuildingBehaviors")) :: any
 
 -- ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -619,6 +620,12 @@ local function spawnBuildingModel(folder: Folder, item: any, cf: CFrame): Model
 	end
 
 	model.Parent = folder
+
+	-- Start building behavior (radar spin, SAM scan, lights, etc.)
+	local padNumStr = folder.Name:match("Tycoon_Pad_(%d+)")
+	local padNum = padNumStr and tonumber(padNumStr) or 1
+	BuildingBehaviors.StartBehavior(padNum, model, item.modelName)
+
 	return model
 end
 
@@ -952,6 +959,9 @@ end
 
 --- Destroy all parts belonging to a tycoon pad.
 function TycoonBuilder.CleanupTycoon(padNumber: number)
+	-- Stop all building behavior loops first
+	BuildingBehaviors.StopAllBehaviors(padNumber)
+
 	local folderName = TYCOON_FOLDER_PREFIX .. tostring(padNumber)
 	local folder = workspace:FindFirstChild(folderName)
 	if folder then
