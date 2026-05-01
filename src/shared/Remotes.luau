@@ -68,6 +68,12 @@ export type RemotesType = {
 	QuestCompleted: RemoteEvent, -- Server confirms quest reward was claimed.
 	--   args: questIndex: number, reward: number
 
+	-- Cash Collector
+	UpdatePendingCash: RemoteEvent, -- Server tells client their pending (uncollected) cash total.
+	--   args: pendingCash: number
+	CollectCash: RemoteEvent, -- Server tells client cash was collected (for feedback).
+	--   args: amount: number
+
 	-- Client → Server (with response)
 	GetPlayerData: RemoteFunction, -- Client requests its full save data snapshot.
 	--   returns: { money: number, income: number, unlockedItems: {string} }
@@ -145,6 +151,9 @@ local Remotes: RemotesType = table.freeze({
 	UpdateQuests = getOrCreate(folder, "RemoteEvent", "UpdateQuests") :: RemoteEvent,
 	ClaimQuestReward = getOrCreate(folder, "RemoteEvent", "ClaimQuestReward") :: RemoteEvent,
 	QuestCompleted = getOrCreate(folder, "RemoteEvent", "QuestCompleted") :: RemoteEvent,
+	-- Cash Collector
+	UpdatePendingCash = getOrCreate(folder, "RemoteEvent", "UpdatePendingCash") :: RemoteEvent,
+	CollectCash = getOrCreate(folder, "RemoteEvent", "CollectCash") :: RemoteEvent,
 })
 
 return Remotes

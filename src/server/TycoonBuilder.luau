@@ -1,5 +1,6 @@
 --!strict
 
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local TycoonConfig = require(ReplicatedStorage.TycoonConfig) :: any
@@ -11,20 +12,27 @@ type TycoonItemCategory = "Building" | "Vehicle" | "Aircraft" | "Naval" | "Strat
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
 
-local PAD_SPACING = 500 -- wide spacing so all 4 bases visible on a big shared map
-local PAD_BASE_POSITION = Vector3.new(0, 0, 0)
+local PAD_SPACING = 500 -- kept for reference; actual positions use PAD_POSITIONS
+local TYCOON_FOLDER_PREFIX = "Tycoon_Pad_"
 
--- Platform dimensions
-local PLAT_WIDTH = 130
-local PLAT_DEPTH = 400
+-- Circular layout: 4 bases at compass points around the central spawn
+local PAD_POSITIONS = {
+	Vector3.new(0, 0, 300),    -- North
+	Vector3.new(300, 0, 0),    -- East
+	Vector3.new(0, 0, -300),   -- South
+	Vector3.new(-300, 0, 0),   -- West
+}
 
--- Button styling
+-- Button styling (flat circular pads)
 local BUTTON_COLOR = BrickColor.new("Lime green")
 local BUTTON_MATERIAL = Enum.Material.Neon
-local BUTTON_SIZE = Vector3.new(14, 1.5, 14)
-local BUTTON_HEIGHT_OFFSET = 1
+local BUTTON_DIAMETER = 10
+local BUTTON_HEIGHT = 1
+local BUTTON_HEIGHT_OFFSET = 0.5
 
-local TYCOON_FOLDER_PREFIX = "Tycoon_Pad_"
+-- Drop-in animation constants
+local DROP_HEIGHT = 30
+local DROP_DURATION = 0.5
 
 -- ── Fixed building positions (offset from pad origin) ─────────────────────────
 -- Layout follows a military base progression from spawn (low Z) to deep base (high Z).
@@ -51,8 +59,7 @@ local BUILDING_POSITIONS: { [string]: Vector3 } = {
 -- ── Internal helpers ──────────────────────────────────────────────────────────
 
 local function padOriginCFrame(padNumber: number): CFrame
-	local offset = Vector3.new((padNumber - 1) * PAD_SPACING, 0, 0)
-	return CFrame.new(PAD_BASE_POSITION + offset)
+	return CFrame.new(PAD_POSITIONS[padNumber] or Vector3.new(0, 0, 0))
 end
 
 local function getOrCreatePadFolder(padNumber: number): Folder
@@ -97,6 +104,93 @@ local function buildingCFrame(padOrigin: CFrame, modelName: string): CFrame
 	end
 	-- Fallback: shouldn't happen, but place at center
 	return padOrigin + Vector3.new(0, 0, 50)
+end
+
+-- ── Drop-in animation ─────────────────────────────────────────────────────────
+-- Drops a model from above with bounce easing and transparency fade.
+
+local function dropInAnimation(model: Model, targetCF: CFrame)
+	-- Collect all BaseParts in the model
+	local parts: { BasePart } = {}
+	for _, desc in model:GetDescendants() do
+		if desc:IsA("BasePart") then
+			table.insert(parts, desc)
+		end
+	end
+
+	-- Also include PrimaryPart if it's a BasePart at top level
+	if model.PrimaryPart and not table.find(parts, model.PrimaryPart) then
+		table.insert(parts, model.PrimaryPart)
+	end
+
+	-- Calculate model-relative offsets from the target position
+	-- The model is already built at targetCF, so we shift it UP and make it transparent
+	local offsets: { [BasePart]: CFrame } = {}
+	for _, part in parts do
+		offsets[part] = part.CFrame
+		-- Move part up by DROP_HEIGHT
+		part.CFrame = part.CFrame + Vector3.new(0, DROP_HEIGHT, 0)
+		part.Transparency = 1
+	end
+
+	-- Tween each part down to its target and fade in
+	local tweenInfo = TweenInfo.new(DROP_DURATION, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out)
+	local fadeInfo = TweenInfo.new(DROP_DURATION * 0.6, Enum.EasingStyle.Linear)
+
+	for _, part in parts do
+		local targetPartCF = offsets[part]
+		-- Determine the final transparency (some parts like Glass might already be semi-transparent)
+		-- We default to 0 unless the part name suggests transparency
+		local finalTransparency = 0
+		if part.Material == Enum.Material.Glass then
+			finalTransparency = 0.3
+		end
+
+		local moveTween = TweenService:Create(part, tweenInfo, {
+			CFrame = targetPartCF,
+		})
+		local fadeTween = TweenService:Create(part, fadeInfo, {
+			Transparency = finalTransparency,
+		})
+		moveTween:Play()
+		fadeTween:Play()
+	end
+
+	-- Dust/impact particle effect on landing
+	task.delay(DROP_DURATION, function()
+		local dustPart = Instance.new("Part")
+		dustPart.Name = "DustEffect"
+		dustPart.Anchored = true
+		dustPart.CanCollide = false
+		dustPart.Transparency = 1
+		dustPart.Size = Vector3.new(1, 1, 1)
+		dustPart.CFrame = targetCF
+		dustPart.Parent = workspace
+
+		local dust = Instance.new("ParticleEmitter")
+		dust.Color = ColorSequence.new(Color3.fromRGB(180, 160, 130))
+		dust.Rate = 0
+		dust.Lifetime = NumberRange.new(0.8, 1.2)
+		dust.Speed = NumberRange.new(8, 15)
+		dust.SpreadAngle = Vector2.new(60, 60)
+		dust.EmissionDirection = Enum.NormalId.Top
+		dust.Size = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 2),
+			NumberSequenceKeypoint.new(1, 0),
+		})
+		dust.Transparency = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0.2),
+			NumberSequenceKeypoint.new(1, 1),
+		})
+		dust.Parent = dustPart
+
+		-- Burst particles
+		dust:Emit(25)
+
+		task.delay(1.5, function()
+			dustPart:Destroy()
+		end)
+	end)
 end
 
 -- ── Billboard GUI helpers ─────────────────────────────────────────────────────
@@ -313,7 +407,6 @@ local function buildHelipad(origin: CFrame): Model
 	local pad = makePart(m, "Pad", Vector3.new(20, 0.5, 20), origin + Vector3.new(0, 0.25, 0),
 		BrickColor.new("Medium stone grey"), Enum.Material.Concrete)
 	m.PrimaryPart = pad
-	-- Yellow circle border (4 arc segments using thin parts)
 	-- "H" marking made of 3 yellow parts
 	makePart(m, "H_Left", Vector3.new(2, 0.15, 10), origin + Vector3.new(-3, 0.6, 0),
 		BrickColor.new("Bright yellow"), Enum.Material.SmoothPlastic)
@@ -322,8 +415,8 @@ local function buildHelipad(origin: CFrame): Model
 	makePart(m, "H_Mid", Vector3.new(8, 0.15, 2), origin + Vector3.new(0, 0.6, 0),
 		BrickColor.new("Bright yellow"), Enum.Material.SmoothPlastic)
 	-- Corner lights
-	for _, xSign in ipairs({-1, 1}) do
-		for _, zSign in ipairs({-1, 1}) do
+	for _, xSign in ipairs({ -1, 1 }) do
+		for _, zSign in ipairs({ -1, 1 }) do
 			local light = makePart(m, "Light", Vector3.new(1, 2, 1),
 				origin + Vector3.new(xSign * 9, 1, zSign * 9),
 				BrickColor.new("Bright yellow"), Enum.Material.Neon)
@@ -474,7 +567,6 @@ local function buildStealthBomberBay(origin: CFrame): Model
 	local m = Instance.new("Model")
 	m.Name = "StealthBomberBay"
 	-- Bunker-style, partially underground look. 20x6x20
-	-- Sunken main structure (only top half visible)
 	local body = makePart(m, "Body", Vector3.new(20, 6, 20), origin + Vector3.new(0, 1, 0),
 		BrickColor.new("Dark stone grey"), Enum.Material.Concrete)
 	m.PrimaryPart = body
@@ -590,7 +682,7 @@ local BUILDERS: { [string]: (origin: CFrame) -> Model } = {
 
 -- ── Spawn building / button helpers ───────────────────────────────────────────
 
-local function spawnBuildingModel(folder: Folder, item: any, cf: CFrame): Model
+local function spawnBuildingModel(folder: Folder, item: any, cf: CFrame, animate: boolean?): Model
 	local builder = BUILDERS[item.modelName]
 	local model: Model
 	if builder then
@@ -621,6 +713,11 @@ local function spawnBuildingModel(folder: Folder, item: any, cf: CFrame): Model
 
 	model.Parent = folder
 
+	-- Drop-in animation if requested
+	if animate then
+		dropInAnimation(model, cf)
+	end
+
 	-- Start building behavior (radar spin, SAM scan, lights, etc.)
 	local padNumStr = folder.Name:match("Tycoon_Pad_(%d+)")
 	local padNum = padNumStr and tonumber(padNumStr) or 1
@@ -633,13 +730,16 @@ local function spawnPurchaseButton(folder: Folder, item: any, cf: CFrame): Part
 	-- Place button slightly in front of the building position (Z - 5)
 	local buttonCF = cf + Vector3.new(0, 0, -5)
 
+	-- Flat cylinder (circle on the ground)
 	local button = Instance.new("Part")
 	button.Name = "PurchaseButton_" .. item.modelName
 	button.Anchored = true
-	button.Size = BUTTON_SIZE
+	button.Shape = Enum.PartType.Cylinder
+	-- Cylinder axis is along X; rotate so flat face is up
+	button.Size = Vector3.new(BUTTON_HEIGHT, BUTTON_DIAMETER, BUTTON_DIAMETER)
+	button.CFrame = (buttonCF + Vector3.new(0, BUTTON_HEIGHT_OFFSET, 0)) * CFrame.Angles(0, 0, math.rad(90))
 	button.BrickColor = BUTTON_COLOR
 	button.Material = BUTTON_MATERIAL
-	button.CFrame = buttonCF + Vector3.new(0, BUTTON_HEIGHT_OFFSET, 0)
 	createButtonGui(button, item.name, item.cost, item.incomePerSecond, item.description)
 
 	-- PointLight
@@ -684,59 +784,89 @@ local function spawnPurchaseButton(folder: Folder, item: any, cf: CFrame): Part
 	return button
 end
 
--- ── Mountains around the perimeter ────────────────────────────────────────────
+-- ── Canyon / Mesa walls around the outer map edge ─────────────────────────────
 
-local function spawnMountains(folder: Folder, origin: CFrame)
-	local halfW = PLAT_WIDTH / 2 + 30 -- beyond the grass border
-	local depthCenter = PLAT_DEPTH / 2 + 10
-	local mountainDefs = {
-		-- Left side mountains (along -X edge)
-		{ offset = Vector3.new(-halfW - 15, 15, 40),   size = Vector3.new(30, 35, 40) },
-		{ offset = Vector3.new(-halfW - 20, 20, 120),  size = Vector3.new(35, 45, 50) },
-		{ offset = Vector3.new(-halfW - 12, 18, 200),  size = Vector3.new(28, 40, 45) },
-		{ offset = Vector3.new(-halfW - 18, 22, 300),  size = Vector3.new(32, 48, 40) },
-		-- Right side mountains (along +X edge)
-		{ offset = Vector3.new(halfW + 15, 15, 60),    size = Vector3.new(30, 35, 45) },
-		{ offset = Vector3.new(halfW + 20, 22, 160),   size = Vector3.new(35, 50, 50) },
-		{ offset = Vector3.new(halfW + 12, 18, 260),   size = Vector3.new(28, 40, 40) },
-		{ offset = Vector3.new(halfW + 18, 20, 350),   size = Vector3.new(32, 45, 45) },
-		-- Back mountains (along +Z edge, behind the base)
-		{ offset = Vector3.new(-30, 22, depthCenter + PLAT_DEPTH / 2 + 15), size = Vector3.new(50, 50, 30) },
-		{ offset = Vector3.new(30, 18, depthCenter + PLAT_DEPTH / 2 + 20),  size = Vector3.new(45, 40, 35) },
-		-- Front mountains (along -Z edge, in front of spawn)
-		{ offset = Vector3.new(-25, 15, -30),  size = Vector3.new(40, 35, 25) },
-		{ offset = Vector3.new(25, 18, -35),   size = Vector3.new(45, 40, 30) },
-		{ offset = Vector3.new(0, 12, -40),    size = Vector3.new(30, 30, 20) },
-	}
+local function spawnCanyonWalls(folder: Folder)
+	local RING_RADIUS = 500
+	local SEGMENT_COUNT = 24
+	local WALL_HEIGHT = 60
+	local WALL_THICKNESS = 40
 
-	local mountainColors = {
-		BrickColor.new("Medium stone grey"),
-		BrickColor.new("Dark stone grey"),
+	local canyonColors = {
 		BrickColor.new("Reddish brown"),
+		BrickColor.new("Dark taupe"),
+		BrickColor.new("Brown"),
 	}
 
-	for i, def in ipairs(mountainDefs) do
-		local color = mountainColors[((i - 1) % #mountainColors) + 1]
-		local mountain = Instance.new("Part")
-		mountain.Name = "Mountain_" .. tostring(i)
-		mountain.Anchored = true
-		mountain.CanCollide = true
-		mountain.Size = def.size
-		mountain.CFrame = origin + def.offset
-		mountain.BrickColor = color
-		mountain.Material = Enum.Material.Slate
-		mountain.Parent = folder
+	for i = 1, SEGMENT_COUNT do
+		local angle = (i / SEGMENT_COUNT) * math.pi * 2
+		local x = math.cos(angle) * RING_RADIUS
+		local z = math.sin(angle) * RING_RADIUS
 
-		-- Add a smaller peak on top for a more natural look
+		-- Vary height for a natural look
+		local heightVariation = math.sin(angle * 3) * 15 + math.cos(angle * 5) * 10
+		local segmentHeight = WALL_HEIGHT + heightVariation
+		local color = canyonColors[((i - 1) % #canyonColors) + 1]
+
+		-- Main canyon wall segment
+		local arcLength = (2 * math.pi * RING_RADIUS) / SEGMENT_COUNT
+		local wall = Instance.new("Part")
+		wall.Name = "CanyonWall_" .. tostring(i)
+		wall.Anchored = true
+		wall.CanCollide = true
+		wall.Size = Vector3.new(arcLength + 5, segmentHeight, WALL_THICKNESS)
+		wall.CFrame = CFrame.new(Vector3.new(x, segmentHeight / 2, z)) * CFrame.Angles(0, angle + math.rad(90), 0)
+		wall.BrickColor = color
+		wall.Material = Enum.Material.Slate
+		wall.Parent = folder
+
+		-- Peak on top for jagged silhouette
+		local peakHeight = segmentHeight * 0.3 + math.random() * 10
 		local peak = Instance.new("Part")
-		peak.Name = "MountainPeak_" .. tostring(i)
+		peak.Name = "CanyonPeak_" .. tostring(i)
 		peak.Anchored = true
 		peak.CanCollide = true
-		peak.Size = Vector3.new(def.size.X * 0.5, def.size.Y * 0.4, def.size.Z * 0.5)
-		peak.CFrame = origin + def.offset + Vector3.new(0, def.size.Y * 0.5 + peak.Size.Y * 0.3, 0)
+		peak.Size = Vector3.new(arcLength * 0.5, peakHeight, WALL_THICKNESS * 0.6)
+		peak.CFrame = CFrame.new(Vector3.new(x, segmentHeight + peakHeight / 2, z)) * CFrame.Angles(0, angle + math.rad(90), 0)
 		peak.BrickColor = color
 		peak.Material = Enum.Material.Slate
 		peak.Parent = folder
+	end
+
+	-- Mesa/plateau formations scattered between bases for visual interest
+	local mesaDefs = {
+		{ pos = Vector3.new(150, 0, 150),  size = Vector3.new(40, 25, 35) },
+		{ pos = Vector3.new(-150, 0, -150), size = Vector3.new(35, 30, 40) },
+		{ pos = Vector3.new(180, 0, -120),  size = Vector3.new(30, 20, 30) },
+		{ pos = Vector3.new(-180, 0, 120),  size = Vector3.new(45, 22, 35) },
+		{ pos = Vector3.new(100, 0, -200),  size = Vector3.new(35, 18, 30) },
+		{ pos = Vector3.new(-100, 0, 200),  size = Vector3.new(30, 28, 40) },
+	}
+
+	for i, mesa in ipairs(mesaDefs) do
+		local color = canyonColors[((i - 1) % #canyonColors) + 1]
+
+		-- Mesa base (wide at bottom)
+		local base = Instance.new("Part")
+		base.Name = "Mesa_" .. tostring(i)
+		base.Anchored = true
+		base.CanCollide = true
+		base.Size = mesa.size
+		base.CFrame = CFrame.new(mesa.pos + Vector3.new(0, mesa.size.Y / 2, 0))
+		base.BrickColor = color
+		base.Material = Enum.Material.Slate
+		base.Parent = folder
+
+		-- Flat top (slightly wider, gives mesa look)
+		local top = Instance.new("Part")
+		top.Name = "MesaTop_" .. tostring(i)
+		top.Anchored = true
+		top.CanCollide = true
+		top.Size = Vector3.new(mesa.size.X + 6, 3, mesa.size.Z + 6)
+		top.CFrame = CFrame.new(mesa.pos + Vector3.new(0, mesa.size.Y + 1.5, 0))
+		top.BrickColor = BrickColor.new("Brick yellow")
+		top.Material = Enum.Material.Sand
+		top.Parent = folder
 	end
 end
 
@@ -757,228 +887,346 @@ local function createSharedWorld()
 	sharedFolder.Name = "SharedWorld"
 	sharedFolder.Parent = workspace
 
-	-- Giant ground plane connecting all 4 pads
-	-- Pads are at X = 0, 500, 1000, 1500 with Z center ~210
-	local totalWidth = PAD_SPACING * 3 + PLAT_WIDTH + 200 -- covers all 4 pads + margins
-	local totalDepth = PLAT_DEPTH + 300
-
+	-- ── Desert ground plane ──────────────────────────────────────────────
+	-- Large circular-ish ground covering the entire play area
+	local groundSize = 1200
 	local ground = Instance.new("Part")
 	ground.Name = "WorldGround"
 	ground.Anchored = true
 	ground.CanCollide = true
-	ground.Size = Vector3.new(totalWidth, 4, totalDepth)
-	ground.BrickColor = BrickColor.new("Earth green")
-	ground.Material = Enum.Material.Grass
-	ground.CFrame = CFrame.new(Vector3.new(PAD_SPACING * 1.5, -4, totalDepth / 2 - 50))
+	ground.Size = Vector3.new(groundSize, 4, groundSize)
+	ground.BrickColor = BrickColor.new("Brick yellow")
+	ground.Material = Enum.Material.Sand
+	ground.CFrame = CFrame.new(Vector3.new(0, -4, 0))
 	ground.Parent = sharedFolder
 
-	-- Central battlefield area between all bases
-	local centerX = PAD_SPACING * 1.5
-	local centerZ = PLAT_DEPTH / 2
-	local battleArea = Instance.new("Part")
-	battleArea.Name = "BattleArea"
-	battleArea.Anchored = true
-	battleArea.CanCollide = true
-	battleArea.Size = Vector3.new(200, 1, 200)
-	battleArea.BrickColor = BrickColor.new("Dark stone grey")
-	battleArea.Material = Enum.Material.Concrete
-	battleArea.CFrame = CFrame.new(Vector3.new(centerX, -1.5, centerZ))
-	battleArea.Parent = sharedFolder
+	-- ── Central spawn area ───────────────────────────────────────────────
+	-- Flat concrete circle at origin (using a cylinder rotated flat)
+	local spawnCircle = Instance.new("Part")
+	spawnCircle.Name = "CentralSpawnPlatform"
+	spawnCircle.Anchored = true
+	spawnCircle.CanCollide = true
+	spawnCircle.Shape = Enum.PartType.Cylinder
+	-- Cylinder: height along X, diameter along Y/Z
+	spawnCircle.Size = Vector3.new(2, 80, 80) -- 2 thick, radius ~40
+	spawnCircle.CFrame = CFrame.new(Vector3.new(0, -1, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	spawnCircle.BrickColor = BrickColor.new("Medium stone grey")
+	spawnCircle.Material = Enum.Material.Concrete
+	spawnCircle.Parent = sharedFolder
 
-	-- Roads connecting each base to the center
-	for pad = 1, 4 do
-		local padX = (pad - 1) * PAD_SPACING
-		local road = Instance.new("Part")
-		road.Name = "Road_" .. pad
-		road.Anchored = true
-		road.CanCollide = true
-		road.Size = Vector3.new(math.abs(padX - centerX) + 20, 0.5, 16)
-		road.BrickColor = BrickColor.new("Really black")
-		road.Material = Enum.Material.SmoothPlastic
-		road.CFrame = CFrame.new(Vector3.new((padX + centerX) / 2, -1, centerZ))
-		road.Parent = sharedFolder
-	end
+	-- SpawnLocation at center
+	local spawn = Instance.new("SpawnLocation")
+	spawn.Name = "CentralSpawn"
+	spawn.Anchored = true
+	spawn.Size = Vector3.new(8, 1, 8)
+	spawn.CFrame = CFrame.new(Vector3.new(0, 0.5, 0))
+	spawn.Transparency = 1
+	spawn.CanCollide = false
+	spawn.Neutral = true
+	spawn.Parent = sharedFolder
 
-	-- Outer boundary mountains (big, surrounding the whole map)
-	local outerMountains = {
-		-- Back wall (high Z)
-		{ pos = Vector3.new(centerX - 300, 30, totalDepth - 20), size = Vector3.new(200, 70, 80) },
-		{ pos = Vector3.new(centerX, 35, totalDepth - 10), size = Vector3.new(250, 80, 90) },
-		{ pos = Vector3.new(centerX + 300, 28, totalDepth - 25), size = Vector3.new(180, 65, 70) },
-		-- Front wall (low Z)
-		{ pos = Vector3.new(centerX - 250, 25, -80), size = Vector3.new(200, 60, 70) },
-		{ pos = Vector3.new(centerX, 30, -90), size = Vector3.new(300, 70, 80) },
-		{ pos = Vector3.new(centerX + 250, 22, -75), size = Vector3.new(180, 55, 65) },
-		-- Left wall (low X)
-		{ pos = Vector3.new(-120, 28, centerZ - 100), size = Vector3.new(80, 65, 200) },
-		{ pos = Vector3.new(-100, 32, centerZ + 100), size = Vector3.new(70, 75, 180) },
-		-- Right wall (high X)
-		{ pos = Vector3.new(PAD_SPACING * 3 + 200, 28, centerZ - 80), size = Vector3.new(80, 65, 200) },
-		{ pos = Vector3.new(PAD_SPACING * 3 + 180, 30, centerZ + 120), size = Vector3.new(70, 70, 180) },
+	-- ── "MILITARY BASE TYCOON" sign on a tall pole ──────────────────────
+	local signPole = Instance.new("Part")
+	signPole.Name = "SignPole"
+	signPole.Anchored = true
+	signPole.CanCollide = true
+	signPole.Size = Vector3.new(2, 30, 2)
+	signPole.CFrame = CFrame.new(Vector3.new(0, 15, 0))
+	signPole.BrickColor = BrickColor.new("Dark stone grey")
+	signPole.Material = Enum.Material.Metal
+	signPole.Parent = sharedFolder
+
+	local signBoard = Instance.new("Part")
+	signBoard.Name = "SignBoard"
+	signBoard.Anchored = true
+	signBoard.CanCollide = false
+	signBoard.Size = Vector3.new(20, 6, 1)
+	signBoard.CFrame = CFrame.new(Vector3.new(0, 33, 0))
+	signBoard.BrickColor = BrickColor.new("Olive")
+	signBoard.Material = Enum.Material.Metal
+	signBoard.Parent = sharedFolder
+
+	local signGui = Instance.new("BillboardGui")
+	signGui.Name = "TitleGui"
+	signGui.Size = UDim2.new(0, 600, 0, 120)
+	signGui.StudsOffset = Vector3.new(0, 1, 0)
+	signGui.AlwaysOnTop = false
+	signGui.Parent = signBoard
+
+	local titleLabel = Instance.new("TextLabel")
+	titleLabel.Size = UDim2.new(1, 0, 1, 0)
+	titleLabel.BackgroundTransparency = 1
+	titleLabel.TextColor3 = Color3.fromRGB(255, 220, 50)
+	titleLabel.TextScaled = true
+	titleLabel.Font = Enum.Font.GothamBold
+	titleLabel.Text = "MILITARY BASE TYCOON"
+	titleLabel.TextStrokeTransparency = 0
+	titleLabel.TextStrokeColor3 = Color3.fromRGB(40, 30, 0)
+	titleLabel.Parent = signGui
+
+	-- ── Directional arrows on the ground pointing to each base ──────────
+	local arrowDirs = {
+		{ dir = Vector3.new(0, 0, 1),   label = "NORTH BASE" },
+		{ dir = Vector3.new(1, 0, 0),   label = "EAST BASE" },
+		{ dir = Vector3.new(0, 0, -1),  label = "SOUTH BASE" },
+		{ dir = Vector3.new(-1, 0, 0),  label = "WEST BASE" },
 	}
 
-	for i, mt in outerMountains do
-		local mountain = Instance.new("Part")
-		mountain.Name = "WorldMountain_" .. i
-		mountain.Anchored = true
-		mountain.CanCollide = true
-		mountain.Size = mt.size
-		mountain.BrickColor = BrickColor.new("Dark taupe")
-		mountain.Material = Enum.Material.Slate
-		mountain.CFrame = CFrame.new(mt.pos)
-		mountain.Parent = sharedFolder
+	for i, arrow in ipairs(arrowDirs) do
+		-- Arrow shaft (long rectangle)
+		local shaft = Instance.new("Part")
+		shaft.Name = "ArrowShaft_" .. tostring(i)
+		shaft.Anchored = true
+		shaft.CanCollide = false
+		shaft.Size = Vector3.new(3, 0.2, 20)
+		local shaftPos = arrow.dir * 30
+		shaft.CFrame = CFrame.new(shaftPos + Vector3.new(0, 0.1, 0)) * CFrame.lookAt(Vector3.zero, arrow.dir)
+		shaft.BrickColor = BrickColor.new("Bright yellow")
+		shaft.Material = Enum.Material.Neon
+		shaft.Parent = sharedFolder
 
-		-- Peak on top
-		local peak = Instance.new("Part")
-		peak.Name = "WorldPeak_" .. i
-		peak.Anchored = true
-		peak.CanCollide = true
-		peak.Size = mt.size * 0.5
-		peak.BrickColor = BrickColor.new("Medium stone grey")
-		peak.Material = Enum.Material.Slate
-		peak.CFrame = CFrame.new(mt.pos + Vector3.new(0, mt.size.Y * 0.6, 0))
-		peak.Parent = sharedFolder
+		-- Arrow label
+		local arrowGui = Instance.new("BillboardGui")
+		arrowGui.Name = "ArrowLabel_" .. tostring(i)
+		arrowGui.Size = UDim2.new(0, 200, 0, 40)
+		arrowGui.StudsOffset = Vector3.new(0, 3, 0)
+		arrowGui.AlwaysOnTop = false
+		arrowGui.Parent = shaft
+
+		local arrowLabel = Instance.new("TextLabel")
+		arrowLabel.Size = UDim2.new(1, 0, 1, 0)
+		arrowLabel.BackgroundTransparency = 1
+		arrowLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+		arrowLabel.TextScaled = true
+		arrowLabel.Font = Enum.Font.GothamBold
+		arrowLabel.Text = arrow.label
+		arrowLabel.TextStrokeTransparency = 0.5
+		arrowLabel.Parent = arrowGui
 	end
+
+	-- ── Decorative elements: flag poles ──────────────────────────────────
+	local flagPositions = {
+		Vector3.new(-15, 0, -15),
+		Vector3.new(15, 0, -15),
+		Vector3.new(-15, 0, 15),
+		Vector3.new(15, 0, 15),
+	}
+
+	for i, pos in ipairs(flagPositions) do
+		local pole = Instance.new("Part")
+		pole.Name = "FlagPole_" .. tostring(i)
+		pole.Anchored = true
+		pole.CanCollide = true
+		pole.Size = Vector3.new(0.5, 18, 0.5)
+		pole.CFrame = CFrame.new(pos + Vector3.new(0, 9, 0))
+		pole.BrickColor = BrickColor.new("Medium stone grey")
+		pole.Material = Enum.Material.Metal
+		pole.Parent = sharedFolder
+
+		-- Flag (small rectangle at top)
+		local flag = Instance.new("Part")
+		flag.Name = "Flag_" .. tostring(i)
+		flag.Anchored = true
+		flag.CanCollide = false
+		flag.Size = Vector3.new(4, 2.5, 0.2)
+		flag.CFrame = CFrame.new(pos + Vector3.new(2.5, 17, 0))
+		flag.BrickColor = BrickColor.new("Bright red")
+		flag.Material = Enum.Material.Fabric
+		flag.Parent = sharedFolder
+	end
+
+	-- ── Decorative sandbag barriers around spawn ────────────────────────
+	local sandbagAngles = { 0, math.rad(90), math.rad(180), math.rad(270) }
+	for i, angle in ipairs(sandbagAngles) do
+		local x = math.cos(angle) * 35
+		local z = math.sin(angle) * 35
+
+		local sandbag = Instance.new("Part")
+		sandbag.Name = "Sandbags_" .. tostring(i)
+		sandbag.Anchored = true
+		sandbag.CanCollide = true
+		sandbag.Size = Vector3.new(10, 3, 3)
+		sandbag.CFrame = CFrame.new(Vector3.new(x, 1.5, z)) * CFrame.Angles(0, angle, 0)
+		sandbag.BrickColor = BrickColor.new("Brick yellow")
+		sandbag.Material = Enum.Material.Fabric
+		sandbag.Parent = sharedFolder
+	end
+
+	-- ── Roads connecting center to each base pad ────────────────────────
+	for i, padPos in ipairs(PAD_POSITIONS) do
+		local direction = padPos.Unit
+		local distance = padPos.Magnitude
+		local midpoint = direction * (distance / 2)
+
+		local road = Instance.new("Part")
+		road.Name = "Road_" .. tostring(i)
+		road.Anchored = true
+		road.CanCollide = true
+		road.Size = Vector3.new(12, 0.5, distance)
+		road.CFrame = CFrame.new(midpoint + Vector3.new(0, -1.5, 0)) * CFrame.lookAt(Vector3.zero, direction)
+		road.BrickColor = BrickColor.new("Dark stone grey")
+		road.Material = Enum.Material.SmoothPlastic
+		road.Parent = sharedFolder
+
+		-- Road center line dashes
+		local dashCount = math.floor(distance / 20)
+		for d = 0, dashCount - 1 do
+			local t = (d + 0.5) / dashCount
+			local dashPos = direction * (t * distance)
+			local dash = Instance.new("Part")
+			dash.Name = "RoadDash_" .. tostring(i) .. "_" .. tostring(d)
+			dash.Anchored = true
+			dash.CanCollide = false
+			dash.Size = Vector3.new(1, 0.1, 8)
+			dash.CFrame = CFrame.new(dashPos + Vector3.new(0, -1.2, 0)) * CFrame.lookAt(Vector3.zero, direction)
+			dash.BrickColor = BrickColor.new("White")
+			dash.Material = Enum.Material.SmoothPlastic
+			dash.Parent = sharedFolder
+		end
+	end
+
+	-- ── Canyon walls around outer edge ───────────────────────────────────
+	spawnCanyonWalls(sharedFolder)
 end
 
---- Set up the base platform, environment, mountains, and free Command Center.
-function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
+-- ── Claim Pad System ──────────────────────────────────────────────────────────
+
+--- Creates the unclaimed glowing claim pad for a base slot.
+function TycoonBuilder.CreateClaimPad(padNumber: number)
+	-- Ensure shared world exists
+	createSharedWorld()
+
+	local folder = getOrCreatePadFolder(padNumber)
+	local origin = padOriginCFrame(padNumber)
+
+	-- Glowing circle on the ground
+	local claimPad = Instance.new("Part")
+	claimPad.Name = "ClaimPad"
+	claimPad.Anchored = true
+	claimPad.CanCollide = true
+	claimPad.Size = Vector3.new(20, 1, 20)
+	claimPad.CFrame = origin + Vector3.new(0, 0.5, 0)
+	claimPad.BrickColor = BrickColor.new("Lime green")
+	claimPad.Material = Enum.Material.Neon
+	claimPad.Parent = folder
+
+	-- Particle emitter for glow effect
+	local particles = Instance.new("ParticleEmitter")
+	particles.Color = ColorSequence.new(Color3.fromRGB(80, 255, 80))
+	particles.Rate = 15
+	particles.Lifetime = NumberRange.new(1, 2)
+	particles.Speed = NumberRange.new(2, 5)
+	particles.SpreadAngle = Vector2.new(30, 30)
+	particles.EmissionDirection = Enum.NormalId.Top
+	particles.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 1),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	particles.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	particles.Parent = claimPad
+
+	-- PointLight for glow
+	local glow = Instance.new("PointLight")
+	glow.Brightness = 3
+	glow.Range = 30
+	glow.Color = Color3.fromRGB(80, 255, 80)
+	glow.Parent = claimPad
+
+	-- "TAP TO CLAIM" BillboardGui
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ClaimGui"
+	billboard.Size = UDim2.new(0, 400, 0, 100)
+	billboard.StudsOffset = Vector3.new(0, 6, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = claimPad
+
+	local claimLabel = Instance.new("TextLabel")
+	claimLabel.Size = UDim2.new(1, 0, 1, 0)
+	claimLabel.BackgroundTransparency = 1
+	claimLabel.TextColor3 = Color3.fromRGB(80, 255, 80)
+	claimLabel.TextScaled = true
+	claimLabel.Font = Enum.Font.GothamBold
+	claimLabel.Text = "TAP TO CLAIM"
+	claimLabel.TextStrokeTransparency = 0
+	claimLabel.TextStrokeColor3 = Color3.fromRGB(0, 40, 0)
+	claimLabel.Parent = billboard
+
+	-- Vertical beacon so it's visible from afar
+	local beacon = Instance.new("Part")
+	beacon.Name = "ClaimBeacon"
+	beacon.Anchored = true
+	beacon.CanCollide = false
+	beacon.Size = Vector3.new(3, 80, 3)
+	beacon.BrickColor = BrickColor.new("Lime green")
+	beacon.Material = Enum.Material.Neon
+	beacon.Transparency = 0.6
+	beacon.CFrame = origin + Vector3.new(0, 40, 0)
+	beacon.Parent = folder
+end
+
+--- Claims a pad for a player: removes the claim pad, spawns the initial base platform.
+function TycoonBuilder.ClaimPad(padNumber: number, _player: Player)
+	local folder = getOrCreatePadFolder(padNumber)
+
+	-- Remove the claim pad and beacon
+	local claimPad = folder:FindFirstChild("ClaimPad")
+	if claimPad then
+		claimPad:Destroy()
+	end
+	local claimBeacon = folder:FindFirstChild("ClaimBeacon")
+	if claimBeacon then
+		claimBeacon:Destroy()
+	end
+
+	-- Spawn a small concrete starting platform
+	local origin = padOriginCFrame(padNumber)
+	local platform = Instance.new("Part")
+	platform.Name = "BasePlatform"
+	platform.Anchored = true
+	platform.CanCollide = true
+	platform.Size = Vector3.new(30, 2, 30)
+	platform.CFrame = origin + Vector3.new(0, -1, 0)
+	platform.BrickColor = BrickColor.new("Medium stone grey")
+	platform.Material = Enum.Material.Concrete
+	platform.Parent = folder
+
+	-- Drop in the Command Center with animation
+	local ccItem = TycoonConfig.Items["CommandCenter"]
+	if ccItem then
+		local ccCF = buildingCFrame(origin, "CommandCenter")
+		spawnBuildingModel(folder, ccItem, ccCF, true)
+	end
+
+	-- Create the cash collector pad
+	TycoonBuilder.CreateCashCollector(padNumber)
+
+	-- Show the first purchasable button
+	local startUnlocked = { "CommandCenter" }
+	TycoonBuilder.SpawnPurchaseButtons(padNumber, startUnlocked)
+end
+
+--- Set up the base platform, environment, and free Command Center.
+--- Called after claiming (or for legacy direct setup).
+function TycoonBuilder.SetupTycoonPad(padNumber: number, player: Player)
 	-- Create the shared world map (once)
 	createSharedWorld()
 
 	local folder = getOrCreatePadFolder(padNumber)
 	local origin = padOriginCFrame(padNumber)
 
-	local platCenterZ = PLAT_DEPTH / 2 + 10 -- center the platform so spawn is near front
-
-	-- ── Surrounding grass platform ────────────────────────────────────────
-	local grass = Instance.new("Part")
-	grass.Name = "GrassPlatform"
-	grass.Anchored = true
-	grass.CanCollide = true
-	grass.Size = Vector3.new(PLAT_WIDTH + 50, 3, PLAT_DEPTH + 50)
-	grass.BrickColor = BrickColor.new("Bright green")
-	grass.Material = Enum.Material.LeafyGrass
-	grass.CFrame = origin + Vector3.new(0, -2.5, platCenterZ)
-	grass.Parent = folder
-
 	-- ── Concrete base platform ────────────────────────────────────────────
 	local base = Instance.new("Part")
 	base.Name = "BasePlatform"
 	base.Anchored = true
 	base.CanCollide = true
-	base.Size = Vector3.new(PLAT_WIDTH, 2, PLAT_DEPTH)
+	base.Size = Vector3.new(100, 2, 400)
 	base.BrickColor = BrickColor.new("Medium stone grey")
 	base.Material = Enum.Material.Concrete
-	base.CFrame = origin + Vector3.new(0, -1, platCenterZ)
+	base.CFrame = origin + Vector3.new(0, -1, 200)
 	base.Parent = folder
-
-	-- ── Runway strip along the front ──────────────────────────────────────
-	local runway = Instance.new("Part")
-	runway.Name = "Runway"
-	runway.Anchored = true
-	runway.CanCollide = true
-	runway.Size = Vector3.new(PLAT_WIDTH - 10, 1, 16)
-	runway.BrickColor = BrickColor.new("Really black")
-	runway.Material = Enum.Material.SmoothPlastic
-	runway.CFrame = origin + Vector3.new(0, 0.01, -5)
-	runway.Parent = folder
-
-	-- Runway center line markings
-	for dash = 0, 7 do
-		local mark = Instance.new("Part")
-		mark.Name = "RunwayMark_" .. dash
-		mark.Anchored = true
-		mark.CanCollide = false
-		mark.Size = Vector3.new(12, 0.1, 1)
-		mark.BrickColor = BrickColor.new("White")
-		mark.Material = Enum.Material.SmoothPlastic
-		mark.CFrame = origin + Vector3.new(-52.5 + dash * 15, 0.55, -5)
-		mark.Parent = folder
-	end
-
-	-- ── Water body behind the base (for naval) ────────────────────────────
-	local water = Instance.new("Part")
-	water.Name = "WaterBody"
-	water.Anchored = true
-	water.CanCollide = false
-	water.Size = Vector3.new(PLAT_WIDTH + 50, 2, 120)
-	water.BrickColor = BrickColor.new("Bright blue")
-	water.Material = Enum.Material.Glass
-	water.Transparency = 0.3
-	water.CFrame = origin + Vector3.new(0, -2, platCenterZ + PLAT_DEPTH / 2 + 70)
-	water.Parent = folder
-
-	-- ── Perimeter fence posts ─────────────────────────────────────────────
-	local fenceZStart = 20
-	local fenceZEnd = PLAT_DEPTH - 20
-	local fenceCount = 14
-	local fenceSpacing = (fenceZEnd - fenceZStart) / (fenceCount - 1)
-
-	for side = -1, 1, 2 do
-		local xPos = side * (PLAT_WIDTH / 2 - 2)
-		for p = 0, fenceCount - 1 do
-			local zPos = fenceZStart + p * fenceSpacing
-			local post = Instance.new("Part")
-			post.Name = "FencePost"
-			post.Anchored = true
-			post.CanCollide = true
-			post.Size = Vector3.new(1, 4, 1)
-			post.BrickColor = BrickColor.new("Dark stone grey")
-			post.Material = Enum.Material.Metal
-			post.CFrame = origin + Vector3.new(xPos, 2, zPos)
-			post.Parent = folder
-
-			if p < fenceCount - 1 then
-				local bar = Instance.new("Part")
-				bar.Name = "FenceBar"
-				bar.Anchored = true
-				bar.CanCollide = false
-				bar.Size = Vector3.new(1, 0.5, fenceSpacing)
-				bar.BrickColor = BrickColor.new("Dark stone grey")
-				bar.Material = Enum.Material.Metal
-				bar.CFrame = origin + Vector3.new(xPos, 3.5, zPos + fenceSpacing / 2)
-				bar.Parent = folder
-			end
-		end
-	end
-
-	-- ── Decorative trees on the grass border ──────────────────────────────
-	local treePositions = {
-		Vector3.new(-PLAT_WIDTH / 2 - 12, 0, 60),
-		Vector3.new(PLAT_WIDTH / 2 + 12, 0, 60),
-		Vector3.new(-PLAT_WIDTH / 2 - 12, 0, 160),
-		Vector3.new(PLAT_WIDTH / 2 + 12, 0, 160),
-		Vector3.new(-PLAT_WIDTH / 2 - 12, 0, 260),
-		Vector3.new(PLAT_WIDTH / 2 + 12, 0, 260),
-		Vector3.new(-PLAT_WIDTH / 2 - 12, 0, 340),
-		Vector3.new(PLAT_WIDTH / 2 + 12, 0, 340),
-	}
-	for t, treeOff in treePositions do
-		local trunk = Instance.new("Part")
-		trunk.Name = "TreeTrunk_" .. t
-		trunk.Anchored = true
-		trunk.CanCollide = true
-		trunk.Size = Vector3.new(2, 6, 2)
-		trunk.BrickColor = BrickColor.new("Reddish brown")
-		trunk.Material = Enum.Material.Wood
-		trunk.CFrame = origin + treeOff + Vector3.new(0, 3, 0)
-		trunk.Parent = folder
-
-		local canopy = Instance.new("Part")
-		canopy.Name = "TreeCanopy_" .. t
-		canopy.Anchored = true
-		canopy.CanCollide = false
-		canopy.Shape = Enum.PartType.Ball
-		canopy.Size = Vector3.new(8, 8, 8)
-		canopy.BrickColor = BrickColor.new("Forest green")
-		canopy.Material = Enum.Material.Grass
-		canopy.CFrame = origin + treeOff + Vector3.new(0, 10, 0)
-		canopy.Parent = folder
-	end
-
-	-- Mountains are now part of the shared world map (createSharedWorld)
-	-- No per-pad mountains needed.
 
 	-- ── SpawnLocation ─────────────────────────────────────────────────────
 	local spawn = Instance.new("SpawnLocation")
@@ -992,12 +1240,15 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
 	spawn.Neutral = true
 	spawn.Parent = folder
 
-	-- ── Spawn free tier-1 Command Center ──────────────────────────────────
+	-- ── Spawn free tier-1 Command Center (with drop-in) ─────────────────
 	local ccItem = TycoonConfig.Items["CommandCenter"]
 	if ccItem then
 		local ccCF = buildingCFrame(origin, "CommandCenter")
-		spawnBuildingModel(folder, ccItem, ccCF)
+		spawnBuildingModel(folder, ccItem, ccCF, true)
 	end
+
+	-- Create the cash collector pad
+	TycoonBuilder.CreateCashCollector(padNumber)
 
 	-- ── Spawn the first purchasable button ────────────────────────────────
 	local startUnlocked = { "CommandCenter" }
@@ -1027,7 +1278,7 @@ function TycoonBuilder.SpawnPurchaseButtons(padNumber: number, unlockedItems: { 
 	spawnPurchaseButton(folder, nextItem, cf)
 end
 
---- Remove the purchase button for itemName, spawn its building, then show next button.
+--- Remove the purchase button for itemName, spawn its building with drop-in animation, then show next button.
 function TycoonBuilder.UnlockItem(padNumber: number, itemName: string, unlockedItems: { string })
 	local folder = getOrCreatePadFolder(padNumber)
 	local origin = padOriginCFrame(padNumber)
@@ -1046,15 +1297,94 @@ function TycoonBuilder.UnlockItem(padNumber: number, itemName: string, unlockedI
 		end
 	end
 
-	-- Spawn building at its designated position
+	-- Spawn building at its designated position with drop-in animation
 	local item = TycoonConfig.Items[itemName]
 	if item then
 		local cf = buildingCFrame(origin, item.modelName)
-		spawnBuildingModel(folder, item, cf)
+		spawnBuildingModel(folder, item, cf, true)
 	end
 
 	-- Show next purchase button
 	TycoonBuilder.SpawnPurchaseButtons(padNumber, unlockedItems)
+end
+
+-- ── Cash Collector Pad ────────────────────────────────────────────────────────
+
+--- Creates the cash collector pad near the entrance of a base.
+function TycoonBuilder.CreateCashCollector(padNumber: number)
+	local folder = getOrCreatePadFolder(padNumber)
+	local origin = padOriginCFrame(padNumber)
+
+	-- Position near the entrance (front of the base)
+	local collectorCF = origin + Vector3.new(15, 0, 10)
+
+	local collector = Instance.new("Part")
+	collector.Name = "CashCollector_" .. tostring(padNumber)
+	collector.Anchored = true
+	collector.CanCollide = true
+	collector.Shape = Enum.PartType.Cylinder
+	-- Flat cylinder on the ground
+	collector.Size = Vector3.new(1, 12, 12)
+	collector.CFrame = (collectorCF + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, 0, math.rad(90))
+	collector.BrickColor = BrickColor.new("Gold")
+	collector.Material = Enum.Material.Neon
+	collector.Parent = folder
+
+	-- CashAmount NumberValue for TycoonManager to update
+	local cashValue = Instance.new("NumberValue")
+	cashValue.Name = "CashAmount"
+	cashValue.Value = 0
+	cashValue.Parent = collector
+
+	-- PointLight for visibility
+	local glow = Instance.new("PointLight")
+	glow.Brightness = 2
+	glow.Range = 20
+	glow.Color = Color3.fromRGB(255, 215, 0)
+	glow.Parent = collector
+
+	-- Particle emitter (subtle gold sparkle)
+	local particles = Instance.new("ParticleEmitter")
+	particles.Color = ColorSequence.new(Color3.fromRGB(255, 215, 0))
+	particles.Rate = 5
+	particles.Lifetime = NumberRange.new(1, 1.5)
+	particles.Speed = NumberRange.new(1, 3)
+	particles.SpreadAngle = Vector2.new(20, 20)
+	particles.EmissionDirection = Enum.NormalId.Top
+	particles.Size = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0.3),
+		NumberSequenceKeypoint.new(1, 0),
+	})
+	particles.Transparency = NumberSequence.new({
+		NumberSequenceKeypoint.new(0, 0),
+		NumberSequenceKeypoint.new(1, 1),
+	})
+	particles.Parent = collector
+
+	-- BillboardGui showing the accumulated cash
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "CollectorGui"
+	billboard.Size = UDim2.new(0, 400, 0, 80)
+	billboard.StudsOffset = Vector3.new(0, 4, 0)
+	billboard.AlwaysOnTop = false
+	billboard.Parent = collector
+
+	local cashLabel = Instance.new("TextLabel")
+	cashLabel.Name = "CashLabel"
+	cashLabel.Size = UDim2.new(1, 0, 1, 0)
+	cashLabel.BackgroundTransparency = 1
+	cashLabel.TextColor3 = Color3.fromRGB(255, 215, 0)
+	cashLabel.TextScaled = true
+	cashLabel.Font = Enum.Font.GothamBold
+	cashLabel.Text = "$0 -- Touch to Collect"
+	cashLabel.TextStrokeTransparency = 0
+	cashLabel.TextStrokeColor3 = Color3.fromRGB(80, 60, 0)
+	cashLabel.Parent = billboard
+
+	-- Update the label whenever CashAmount changes
+	cashValue.Changed:Connect(function(newValue: number)
+		cashLabel.Text = "$" .. tostring(math.floor(newValue)) .. " -- Touch to Collect"
+	end)
 end
 
 --- Destroy all parts belonging to a tycoon pad.

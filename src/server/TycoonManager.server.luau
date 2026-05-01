@@ -18,6 +18,7 @@ local QuestManager = require(script.Parent.QuestManager) :: any
 type TycoonState = {
 	pad: number,
 	balance: number,
+	pendingCash: number,
 	incomePerSecond: number,
 	unlockedItems: { string },
 	lastSave: number,
@@ -38,6 +39,14 @@ local padInUse: { [number]: boolean } = {
 }
 
 local MAX_PADS = 4
+local PAD_SPACING = 500
+
+-- Cash collector debounce per player (tick of last collection).
+local lastCollectTime: { [Player]: number } = {}
+local COLLECT_DEBOUNCE = 0.5
+
+-- Claim pad touch connections (cleaned up once a player claims).
+local claimPadConnections: { [number]: RBXScriptConnection } = {}
 
 -- ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -90,39 +99,86 @@ DailyRewardManager.SetAddCashCallback(addCash)
 QuestManager.SetAddCashCallback(addCash)
 
 -- ── Income tick callback ───────────────────────────────────────────────────────
+-- Income now accumulates into pendingCash instead of directly into balance.
+-- Player must step on the CashCollector pad to collect.
 
 IncomeManager.SetTickCallback(function(player: Player, amount: number)
 	local state = tycoons[player]
 	if not state then
 		return
 	end
-	state.balance += amount
-	state.lastSave = state.lastSave -- keep reference (actual save is on leave)
-	fireUpdateMoney(player, state.balance)
-	LeaderboardManager.UpdateCash(player, state.balance)
+	state.pendingCash += amount
+
+	-- Send pending cash to client so collector pad label updates.
+	Remotes.UpdatePendingCash:FireClient(player, state.pendingCash)
 
 	-- Track quest progress for "earn" quests.
 	QuestManager.OnIncome(player, amount)
 end)
 
--- ── Player join ───────────────────────────────────────────────────────────────
+-- ── Cash Collector helper ────────────────────────────────────────────────────
 
-local function onPlayerAdded(player: Player)
-	local padNumber = getFreePad()
-	if padNumber == nil then
-		warn("[TycoonManager] No free pads for " .. player.Name .. ". Server is full.")
-		player:Kick("The server is full — all tycoon pads are occupied. Please try again later.")
+local function collectPendingCash(player: Player)
+	local state = tycoons[player]
+	if not state or state.pendingCash <= 0 then
 		return
 	end
 
-	padInUse[padNumber] = true
+	-- Debounce: only collect once per COLLECT_DEBOUNCE seconds.
+	local now = tick()
+	local lastTime = lastCollectTime[player]
+	if lastTime and (now - lastTime) < COLLECT_DEBOUNCE then
+		return
+	end
+	lastCollectTime[player] = now
 
+	local amount = state.pendingCash
+	state.pendingCash = 0
+	state.balance += amount
+
+	fireUpdateMoney(player, state.balance)
+	LeaderboardManager.UpdateCash(player, state.balance)
+	Remotes.CollectCash:FireClient(player, amount)
+	Remotes.UpdatePendingCash:FireClient(player, 0)
+end
+
+-- ── Setup Cash Collector touch detection for a claimed pad ───────────────────
+
+local function setupCashCollector(padNumber: number, player: Player)
+	local workspace = game:GetService("Workspace")
+	local tycoonFolder = workspace:FindFirstChild("Tycoon_Pad_" .. tostring(padNumber))
+	if not tycoonFolder then
+		return
+	end
+
+	-- Look for CashCollector part inside the tycoon folder (any depth).
+	local collector = tycoonFolder:FindFirstChild("CashCollector", true) :: BasePart?
+	if not collector then
+		return
+	end
+
+	collector.Touched:Connect(function(hit: BasePart)
+		local character = hit.Parent :: Model?
+		if not character then
+			return
+		end
+		local hitPlayer = Players:GetPlayerFromCharacter(character)
+		if hitPlayer == player then
+			collectPendingCash(player)
+		end
+	end)
+end
+
+-- ── Setup tycoon after claiming a pad ────────────────────────────────────────
+
+local function setupTycoonForPlayer(player: Player, padNumber: number)
 	-- Load persistent data
 	local data = DataManager.LoadData(player)
 
 	local state: TycoonState = {
 		pad = padNumber,
 		balance = data.balance,
+		pendingCash = 0,
 		incomePerSecond = data.incomePerSecond,
 		unlockedItems = data.unlockedItems,
 		lastSave = os.time(),
@@ -140,27 +196,28 @@ local function onPlayerAdded(player: Player)
 	-- Build the tycoon in the world
 	TycoonBuilder.SetupTycoonPad(padNumber, player)
 
-	-- Teleport the player to their pad once it's built
-	local PAD_SPACING = 500
-	local spawnCF = CFrame.new(Vector3.new((padNumber - 1) * PAD_SPACING, 5, 10))
+	-- Teleport the player to their claimed pad
+	local padOrigin = Vector3.new((padNumber - 1) * PAD_SPACING, 0, 0)
+	local padSpawnCF = CFrame.new(padOrigin + Vector3.new(0, 5, 10))
+
 	local character = player.Character or player.CharacterAdded:Wait()
 	local rootPart = character:WaitForChild("HumanoidRootPart", 10) :: BasePart?
 	if rootPart then
-		rootPart.CFrame = spawnCF
+		rootPart.CFrame = padSpawnCF
 	end
 
 	-- Respawn player on their pad if they fall below the map
 	local function onCharacterAdded(newCharacter: Model)
 		local hrp = newCharacter:WaitForChild("HumanoidRootPart", 10) :: BasePart?
 		if hrp then
-			hrp.CFrame = spawnCF
+			hrp.CFrame = padSpawnCF
 		end
 		local humanoid = newCharacter:WaitForChild("Humanoid", 10) :: Humanoid?
 		if humanoid then
 			task.spawn(function()
 				while humanoid and humanoid.Health > 0 do
 					if hrp and hrp.Position.Y < -50 then
-						hrp.CFrame = spawnCF
+						hrp.CFrame = padSpawnCF
 						hrp.AssemblyLinearVelocity = Vector3.zero
 					end
 					task.wait(0.5)
@@ -174,10 +231,10 @@ local function onPlayerAdded(player: Player)
 	end
 
 	-- Register the pad with UnitManager so it knows the world-space center.
-	local padCenter = CFrame.new(Vector3.new((padNumber - 1) * 500, 0, 0))
+	local padCenter = CFrame.new(padOrigin)
 	UnitManager.RegisterPad(padNumber, player, padCenter)
 
-	-- Re-spawn all previously unlocked buildings (skip CommandCenter — already placed by SetupTycoonPad)
+	-- Re-spawn all previously unlocked buildings (skip CommandCenter -- already placed by SetupTycoonPad)
 	for _, itemName in state.unlockedItems do
 		if itemName ~= "CommandCenter" then
 			TycoonBuilder.UnlockItem(padNumber, itemName, state.unlockedItems)
@@ -198,12 +255,16 @@ local function onPlayerAdded(player: Player)
 	-- Show the correct next purchase button
 	TycoonBuilder.SpawnPurchaseButtons(padNumber, state.unlockedItems)
 
+	-- Setup cash collector touch detection
+	setupCashCollector(padNumber, player)
+
 	-- Start income loop
 	IncomeManager.StartIncome(player, state.incomePerSecond)
 
 	-- Send initial state to the client
 	fireUpdateMoney(player, state.balance)
 	Remotes.UpdateIncome:FireClient(player, state.incomePerSecond)
+	Remotes.UpdatePendingCash:FireClient(player, state.pendingCash)
 
 	-- Register base with combat system
 	task.defer(function()
@@ -223,7 +284,7 @@ local function onPlayerAdded(player: Player)
 
 	print(
 		string.format(
-			"[TycoonManager] %s joined → pad %d | $%d | %d ips",
+			"[TycoonManager] %s claimed pad %d | $%d | %d ips",
 			player.Name,
 			padNumber,
 			state.balance,
@@ -232,16 +293,157 @@ local function onPlayerAdded(player: Player)
 	)
 end
 
+-- ── Claim Pad helpers ────────────────────────────────────────────────────────
+
+local function removeAllClaimPads()
+	for padNum, conn in claimPadConnections do
+		conn:Disconnect()
+		claimPadConnections[padNum] = nil
+	end
+	-- Remove claim pad parts from workspace
+	local workspace = game:GetService("Workspace")
+	for i = 1, MAX_PADS do
+		local claimPart = workspace:FindFirstChild("ClaimPad_" .. tostring(i))
+		if claimPart then
+			claimPart:Destroy()
+		end
+	end
+end
+
+local function createClaimPadsForPlayer(player: Player)
+	local workspace = game:GetService("Workspace")
+
+	for i = 1, MAX_PADS do
+		if padInUse[i] then
+			continue
+		end
+
+		-- Create claim pad via TycoonBuilder if available, otherwise build one here.
+		local padOrigin = Vector3.new((i - 1) * PAD_SPACING, 0, 0)
+		local claimPart = Instance.new("Part")
+		claimPart.Name = "ClaimPad_" .. tostring(i)
+		claimPart.Size = Vector3.new(20, 2, 20)
+		claimPart.Position = padOrigin + Vector3.new(0, 1, 0)
+		claimPart.Anchored = true
+		claimPart.CanCollide = true
+		claimPart.BrickColor = BrickColor.new("Lime green")
+		claimPart.Material = Enum.Material.Neon
+
+		local surfaceGui = Instance.new("SurfaceGui")
+		surfaceGui.Face = Enum.NormalId.Top
+		surfaceGui.Parent = claimPart
+
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Text = "TAP TO CLAIM"
+		label.TextColor3 = Color3.new(1, 1, 1)
+		label.TextScaled = true
+		label.Font = Enum.Font.GothamBold
+		label.Parent = surfaceGui
+
+		claimPart.Parent = workspace
+
+		-- Touch detection for this claim pad
+		local conn = claimPart.Touched:Connect(function(hit: BasePart)
+			local character = hit.Parent :: Model?
+			if not character then
+				return
+			end
+			local hitPlayer = Players:GetPlayerFromCharacter(character)
+			if not hitPlayer then
+				return
+			end
+			-- Only allow players who don't already have a pad
+			if tycoons[hitPlayer] then
+				return
+			end
+			-- Only allow the specific player we created pads for (or any unclaimed player)
+			if padInUse[i] then
+				return
+			end
+
+			-- Claim this pad
+			padInUse[i] = true
+
+			-- Remove all claim pads for this player
+			removeAllClaimPads()
+
+			-- Re-create claim pads for other unclaimed players (if any)
+			-- This is handled by other players' own claim pad sets
+
+			-- Setup the tycoon
+			setupTycoonForPlayer(hitPlayer, i)
+		end)
+
+		claimPadConnections[i] = conn
+	end
+end
+
+-- ── Player join ───────────────────────────────────────────────────────────────
+
+local function onPlayerAdded(player: Player)
+	-- Check if there are any free pads at all
+	local hasFree = getFreePad() ~= nil
+	if not hasFree then
+		warn("[TycoonManager] No free pads for " .. player.Name .. ". Server is full.")
+		player:Kick("The server is full — all tycoon pads are occupied. Please try again later.")
+		return
+	end
+
+	-- Setup leaderboard early so stats show while player picks a pad
+	LeaderboardManager.Setup(player)
+
+	-- Spawn player at center of map instead of a specific pad
+	local spawnCF = CFrame.new(Vector3.new(0, 5, 0))
+
+	local character = player.Character or player.CharacterAdded:Wait()
+	local rootPart = character:WaitForChild("HumanoidRootPart", 10) :: BasePart?
+	if rootPart then
+		rootPart.CFrame = spawnCF
+	end
+
+	-- Also handle respawns before claiming -- spawn at center
+	local preClaimConn: RBXScriptConnection? = nil
+	preClaimConn = player.CharacterAdded:Connect(function(newCharacter: Model)
+		-- If player has claimed a pad, this connection should be disconnected
+		if tycoons[player] then
+			if preClaimConn then
+				preClaimConn:Disconnect()
+				preClaimConn = nil
+			end
+			return
+		end
+		local hrp = newCharacter:WaitForChild("HumanoidRootPart", 10) :: BasePart?
+		if hrp then
+			hrp.CFrame = spawnCF
+		end
+	end)
+
+	-- Create claim pads for all unclaimed pads
+	createClaimPadsForPlayer(player)
+
+	print(string.format("[TycoonManager] %s joined — spawned at center, waiting for pad claim", player.Name))
+end
+
 -- ── Player leave ──────────────────────────────────────────────────────────────
 
 local function onPlayerRemoving(player: Player)
 	local state = tycoons[player]
 	if not state then
+		-- Player never claimed a pad; just clean up
+		lastCollectTime[player] = nil
 		return
 	end
 
 	-- Stop the income loop first so no more ticks fire
 	IncomeManager.StopIncome(player)
+
+	-- Collect any remaining pending cash into balance before saving
+	if state.pendingCash > 0 then
+		state.balance += state.pendingCash
+		state.pendingCash = 0
+	end
 
 	-- Pull latest daily reward data before saving.
 	local lastDR, drStreak = DailyRewardManager.GetData(player)
@@ -271,6 +473,9 @@ local function onPlayerRemoving(player: Player)
 
 	-- Free the pad
 	padInUse[state.pad] = false
+
+	-- Clean up debounce tracking
+	lastCollectTime[player] = nil
 
 	tycoons[player] = nil
 
@@ -411,6 +616,30 @@ Players.PlayerAdded:Connect(onPlayerAdded)
 Players.PlayerRemoving:Connect(onPlayerRemoving)
 
 Remotes.PurchaseItem.OnServerEvent:Connect(onPurchaseRequest)
+
+-- ClaimTycoon remote handler (alternative to touch-based claiming)
+Remotes.ClaimTycoon.OnServerEvent:Connect(function(player: Player, padNumber: unknown)
+	-- Validate
+	if tycoons[player] then
+		return -- already claimed
+	end
+	if type(padNumber) ~= "number" then
+		return
+	end
+	local padNum = math.floor(padNumber :: number)
+	if padNum < 1 or padNum > MAX_PADS then
+		return
+	end
+	if padInUse[padNum] then
+		return
+	end
+
+	-- Claim the pad
+	padInUse[padNum] = true
+	removeAllClaimPads()
+	setupTycoonForPlayer(player, padNum)
+end)
+
 Remotes.ClaimDailyReward.OnServerEvent:Connect(function(player: Player)
 	DailyRewardManager.ClaimReward(player)
 end)
