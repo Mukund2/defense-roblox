@@ -11,7 +11,7 @@ type TycoonItemCategory = "Building" | "Vehicle" | "Aircraft" | "Naval" | "Strat
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
 
-local PAD_SPACING = 150
+local PAD_SPACING = 500 -- wide spacing so all 4 bases visible on a big shared map
 local PAD_BASE_POSITION = Vector3.new(0, 0, 0)
 
 -- Platform dimensions
@@ -744,8 +744,108 @@ end
 
 local TycoonBuilder = {}
 
+-- Shared world terrain (created once for the whole server)
+local sharedWorldCreated = false
+
+local function createSharedWorld()
+	if sharedWorldCreated then
+		return
+	end
+	sharedWorldCreated = true
+
+	local sharedFolder = Instance.new("Folder")
+	sharedFolder.Name = "SharedWorld"
+	sharedFolder.Parent = workspace
+
+	-- Giant ground plane connecting all 4 pads
+	-- Pads are at X = 0, 500, 1000, 1500 with Z center ~210
+	local totalWidth = PAD_SPACING * 3 + PLAT_WIDTH + 200 -- covers all 4 pads + margins
+	local totalDepth = PLAT_DEPTH + 300
+
+	local ground = Instance.new("Part")
+	ground.Name = "WorldGround"
+	ground.Anchored = true
+	ground.CanCollide = true
+	ground.Size = Vector3.new(totalWidth, 4, totalDepth)
+	ground.BrickColor = BrickColor.new("Earth green")
+	ground.Material = Enum.Material.Grass
+	ground.CFrame = CFrame.new(Vector3.new(PAD_SPACING * 1.5, -4, totalDepth / 2 - 50))
+	ground.Parent = sharedFolder
+
+	-- Central battlefield area between all bases
+	local centerX = PAD_SPACING * 1.5
+	local centerZ = PLAT_DEPTH / 2
+	local battleArea = Instance.new("Part")
+	battleArea.Name = "BattleArea"
+	battleArea.Anchored = true
+	battleArea.CanCollide = true
+	battleArea.Size = Vector3.new(200, 1, 200)
+	battleArea.BrickColor = BrickColor.new("Dark stone grey")
+	battleArea.Material = Enum.Material.Concrete
+	battleArea.CFrame = CFrame.new(Vector3.new(centerX, -1.5, centerZ))
+	battleArea.Parent = sharedFolder
+
+	-- Roads connecting each base to the center
+	for pad = 1, 4 do
+		local padX = (pad - 1) * PAD_SPACING
+		local road = Instance.new("Part")
+		road.Name = "Road_" .. pad
+		road.Anchored = true
+		road.CanCollide = true
+		road.Size = Vector3.new(math.abs(padX - centerX) + 20, 0.5, 16)
+		road.BrickColor = BrickColor.new("Really black")
+		road.Material = Enum.Material.SmoothPlastic
+		road.CFrame = CFrame.new(Vector3.new((padX + centerX) / 2, -1, centerZ))
+		road.Parent = sharedFolder
+	end
+
+	-- Outer boundary mountains (big, surrounding the whole map)
+	local outerMountains = {
+		-- Back wall (high Z)
+		{ pos = Vector3.new(centerX - 300, 30, totalDepth - 20), size = Vector3.new(200, 70, 80) },
+		{ pos = Vector3.new(centerX, 35, totalDepth - 10), size = Vector3.new(250, 80, 90) },
+		{ pos = Vector3.new(centerX + 300, 28, totalDepth - 25), size = Vector3.new(180, 65, 70) },
+		-- Front wall (low Z)
+		{ pos = Vector3.new(centerX - 250, 25, -80), size = Vector3.new(200, 60, 70) },
+		{ pos = Vector3.new(centerX, 30, -90), size = Vector3.new(300, 70, 80) },
+		{ pos = Vector3.new(centerX + 250, 22, -75), size = Vector3.new(180, 55, 65) },
+		-- Left wall (low X)
+		{ pos = Vector3.new(-120, 28, centerZ - 100), size = Vector3.new(80, 65, 200) },
+		{ pos = Vector3.new(-100, 32, centerZ + 100), size = Vector3.new(70, 75, 180) },
+		-- Right wall (high X)
+		{ pos = Vector3.new(PAD_SPACING * 3 + 200, 28, centerZ - 80), size = Vector3.new(80, 65, 200) },
+		{ pos = Vector3.new(PAD_SPACING * 3 + 180, 30, centerZ + 120), size = Vector3.new(70, 70, 180) },
+	}
+
+	for i, mt in outerMountains do
+		local mountain = Instance.new("Part")
+		mountain.Name = "WorldMountain_" .. i
+		mountain.Anchored = true
+		mountain.CanCollide = true
+		mountain.Size = mt.size
+		mountain.BrickColor = BrickColor.new("Dark taupe")
+		mountain.Material = Enum.Material.Slate
+		mountain.CFrame = CFrame.new(mt.pos)
+		mountain.Parent = sharedFolder
+
+		-- Peak on top
+		local peak = Instance.new("Part")
+		peak.Name = "WorldPeak_" .. i
+		peak.Anchored = true
+		peak.CanCollide = true
+		peak.Size = mt.size * 0.5
+		peak.BrickColor = BrickColor.new("Medium stone grey")
+		peak.Material = Enum.Material.Slate
+		peak.CFrame = CFrame.new(mt.pos + Vector3.new(0, mt.size.Y * 0.6, 0))
+		peak.Parent = sharedFolder
+	end
+end
+
 --- Set up the base platform, environment, mountains, and free Command Center.
 function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
+	-- Create the shared world map (once)
+	createSharedWorld()
+
 	local folder = getOrCreatePadFolder(padNumber)
 	local origin = padOriginCFrame(padNumber)
 
@@ -877,8 +977,8 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, _player: Player)
 		canopy.Parent = folder
 	end
 
-	-- ── Mountains around the perimeter ────────────────────────────────────
-	spawnMountains(folder, origin)
+	-- Mountains are now part of the shared world map (createSharedWorld)
+	-- No per-pad mountains needed.
 
 	-- ── SpawnLocation ─────────────────────────────────────────────────────
 	local spawn = Instance.new("SpawnLocation")
