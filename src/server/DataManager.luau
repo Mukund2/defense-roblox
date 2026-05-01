@@ -29,9 +29,9 @@ export type PlayerData = {
 }
 
 local DEFAULT_DATA: PlayerData = {
-	balance = 0,
-	incomePerSecond = 5,
-	unlockedItems = { "CommandCenter" },
+	balance = 500,
+	incomePerSecond = 0,
+	unlockedItems = {},
 	totalEarned = 0,
 	lastDailyReward = 0,
 	dailyStreak = 0,

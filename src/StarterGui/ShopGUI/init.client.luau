@@ -42,7 +42,7 @@ local CATEGORY_COLORS: { [string]: Color3 } = {
 
 -- ── State ───────────────────────────────────────────────────────────────────
 local currentMoney: number = 0
-local unlockedItems: { [string]: boolean } = { CommandCenter = true }
+local unlockedItems: { [string]: boolean } = {}
 local isOpen: boolean = false
 
 -- ── Utility constructors ────────────────────────────────────────────────────

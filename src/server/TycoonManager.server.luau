@@ -250,11 +250,9 @@ local function setupTycoonForPlayer(player: Player, padNumber: number)
 	local padCenter = CFrame.new(padPos)
 	UnitManager.RegisterPad(padNumber, player, padCenter)
 
-	-- Re-spawn all previously unlocked buildings (skip CommandCenter -- already placed by SetupTycoonPad)
+	-- Re-spawn all previously unlocked buildings
 	for _, itemName in state.unlockedItems do
-		if itemName ~= "CommandCenter" then
-			TycoonBuilder.UnlockItem(padNumber, itemName, state.unlockedItems)
-		end
+		TycoonBuilder.UnlockItem(padNumber, itemName, state.unlockedItems)
 	end
 
 	-- Units disabled — placeholder rectangles wandering around look bad.
@@ -634,7 +632,7 @@ end
 Remotes.GetPlayerData.OnServerInvoke = function(player: Player)
 	local state = tycoons[player]
 	if not state then
-		return { money = 0, income = 0, unlockedItems = { "CommandCenter" } }
+		return { money = 0, income = 0, unlockedItems = {} }
 	end
 	return {
 		money = state.balance,

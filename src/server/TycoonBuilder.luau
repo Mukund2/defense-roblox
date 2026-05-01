@@ -1263,18 +1263,11 @@ function TycoonBuilder.SetupTycoonPad(padNumber: number, player: Player)
 	spawn.Neutral = true
 	spawn.Parent = folder
 
-	-- ── Spawn free tier-1 Command Center (with drop-in) ─────────────────
-	local ccItem = TycoonConfig.Items["CommandCenter"]
-	if ccItem then
-		local ccCF = buildingCFrame(origin, "CommandCenter")
-		spawnBuildingModel(folder, ccItem, ccCF, true)
-	end
-
 	-- Create the cash collector pad
 	TycoonBuilder.CreateCashCollector(padNumber)
 
-	-- ── Spawn the first purchasable button ────────────────────────────────
-	local startUnlocked = { "CommandCenter" }
+	-- ── Show the first purchasable button (nothing pre-built) ────────────
+	local startUnlocked: { string } = {}
 	TycoonBuilder.SpawnPurchaseButtons(padNumber, startUnlocked)
 end
 
