@@ -788,83 +788,71 @@ end
 -- ── Canyon / Mesa walls around the outer map edge ─────────────────────────────
 
 local function spawnCanyonWalls(folder: Folder)
-	local RING_RADIUS = 500
-	local SEGMENT_COUNT = 48
-	local WALL_HEIGHT = 60
-	local WALL_THICKNESS = 50
+	-- Scatter large rocky hills around the border instead of a perfect ring
+	local rng = Random.new(42) -- deterministic seed so all clients see the same layout
 
 	local canyonColors = {
 		BrickColor.new("Reddish brown"),
 		BrickColor.new("Dark taupe"),
 		BrickColor.new("Brown"),
+		BrickColor.new("Nougat"),
 	}
 
-	for i = 1, SEGMENT_COUNT do
-		local angle = (i / SEGMENT_COUNT) * math.pi * 2
-		local x = math.cos(angle) * RING_RADIUS
-		local z = math.sin(angle) * RING_RADIUS
+	-- Place rocky hills in a rough ring at radius 400-550
+	for i = 1, 60 do
+		local angle = (i / 60) * math.pi * 2 + rng:NextNumber(-0.1, 0.1)
+		local radius = 450 + rng:NextNumber(-50, 80)
+		local x = math.cos(angle) * radius
+		local z = math.sin(angle) * radius
 
-		-- Vary height for a natural look
-		local heightVariation = math.sin(angle * 3) * 15 + math.cos(angle * 5) * 10
-		local segmentHeight = WALL_HEIGHT + heightVariation
-		local color = canyonColors[((i - 1) % #canyonColors) + 1]
+		local height = rng:NextNumber(30, 80)
+		local width = rng:NextNumber(30, 70)
+		local depth = rng:NextNumber(25, 55)
+		local color = canyonColors[rng:NextInteger(1, #canyonColors)]
 
-		-- Main canyon wall segment
-		local arcLength = (2 * math.pi * RING_RADIUS) / SEGMENT_COUNT
-		local wall = Instance.new("Part")
-		wall.Name = "CanyonWall_" .. tostring(i)
-		wall.Anchored = true
-		wall.CanCollide = true
-		wall.Size = Vector3.new(arcLength + 15, segmentHeight, WALL_THICKNESS)
-		wall.CFrame = CFrame.new(Vector3.new(x, segmentHeight / 2, z)) * CFrame.Angles(0, angle + math.rad(90), 0)
-		wall.BrickColor = color
-		wall.Material = Enum.Material.Slate
-		wall.Parent = folder
-
-		-- Peak on top for jagged silhouette
-		local peakHeight = segmentHeight * 0.3 + math.random() * 10
-		local peak = Instance.new("Part")
-		peak.Name = "CanyonPeak_" .. tostring(i)
-		peak.Anchored = true
-		peak.CanCollide = true
-		peak.Size = Vector3.new(arcLength * 0.5, peakHeight, WALL_THICKNESS * 0.6)
-		peak.CFrame = CFrame.new(Vector3.new(x, segmentHeight + peakHeight / 2, z)) * CFrame.Angles(0, angle + math.rad(90), 0)
-		peak.BrickColor = color
-		peak.Material = Enum.Material.Slate
-		peak.Parent = folder
+		local rock = Instance.new("Part")
+		rock.Name = "Rock_" .. tostring(i)
+		rock.Anchored = true
+		rock.CanCollide = true
+		rock.Size = Vector3.new(width, height, depth)
+		rock.CFrame = CFrame.new(x, height / 2 - 4, z)
+			* CFrame.Angles(rng:NextNumber(-0.08, 0.08), angle, rng:NextNumber(-0.05, 0.05))
+		rock.BrickColor = color
+		rock.Material = Enum.Material.Slate
+		rock.Parent = folder
 	end
 
-	-- Mesa/plateau formations scattered between bases for visual interest
-	local mesaDefs = {
-		{ pos = Vector3.new(150, 0, 150),  size = Vector3.new(40, 25, 35) },
-		{ pos = Vector3.new(-150, 0, -150), size = Vector3.new(35, 30, 40) },
-		{ pos = Vector3.new(180, 0, -120),  size = Vector3.new(30, 20, 30) },
-		{ pos = Vector3.new(-180, 0, 120),  size = Vector3.new(45, 22, 35) },
-		{ pos = Vector3.new(100, 0, -200),  size = Vector3.new(35, 18, 30) },
-		{ pos = Vector3.new(-100, 0, 200),  size = Vector3.new(30, 28, 40) },
+	-- Scatter some hills/boulders in the midfield for cover and visual interest
+	local hillDefs = {
+		{ pos = Vector3.new(150, 0, 150),  height = 18, width = 35 },
+		{ pos = Vector3.new(-150, 0, -150), height = 22, width = 30 },
+		{ pos = Vector3.new(180, 0, -120),  height = 14, width = 25 },
+		{ pos = Vector3.new(-180, 0, 120),  height = 20, width = 40 },
+		{ pos = Vector3.new(100, 0, -200),  height = 12, width = 28 },
+		{ pos = Vector3.new(-100, 0, 200),  height = 16, width = 32 },
+		{ pos = Vector3.new(200, 0, 200),   height = 10, width = 20 },
+		{ pos = Vector3.new(-200, 0, -200), height = 15, width = 22 },
 	}
 
-	for i, mesa in ipairs(mesaDefs) do
+	for i, def in ipairs(hillDefs) do
 		local color = canyonColors[((i - 1) % #canyonColors) + 1]
+		local hill = Instance.new("Part")
+		hill.Name = "Hill_" .. tostring(i)
+		hill.Anchored = true
+		hill.CanCollide = true
+		hill.Size = Vector3.new(def.width, def.height, def.width * 0.8)
+		hill.CFrame = CFrame.new(def.pos + Vector3.new(0, def.height / 2 - 2, 0))
+		hill.BrickColor = color
+		hill.Material = Enum.Material.Slate
+		hill.Parent = folder
 
-		-- Mesa base (wide at bottom)
-		local base = Instance.new("Part")
-		base.Name = "Mesa_" .. tostring(i)
-		base.Anchored = true
-		base.CanCollide = true
-		base.Size = mesa.size
-		base.CFrame = CFrame.new(mesa.pos + Vector3.new(0, mesa.size.Y / 2, 0))
-		base.BrickColor = color
-		base.Material = Enum.Material.Slate
-		base.Parent = folder
-
-		-- Flat top (slightly wider, gives mesa look)
+		-- Grassy top
 		local top = Instance.new("Part")
-		top.Name = "MesaTop_" .. tostring(i)
+		top.Name = "HillTop_" .. tostring(i)
 		top.Anchored = true
 		top.CanCollide = true
-		top.Size = Vector3.new(mesa.size.X + 6, 3, mesa.size.Z + 6)
-		top.CFrame = CFrame.new(mesa.pos + Vector3.new(0, mesa.size.Y + 1.5, 0))
+		top.Size = Vector3.new(def.width + 4, 2, def.width * 0.8 + 4)
+		top.CFrame = CFrame.new(def.pos + Vector3.new(0, def.height - 1, 0))
 		top.BrickColor = BrickColor.new("Bright green")
 		top.Material = Enum.Material.Grass
 		top.Parent = folder
@@ -950,7 +938,7 @@ local function createSharedWorld()
 	signPole.Anchored = true
 	signPole.CanCollide = true
 	signPole.Size = Vector3.new(2, 30, 2)
-	signPole.CFrame = CFrame.new(Vector3.new(0, 15, 0))
+	signPole.CFrame = CFrame.new(Vector3.new(0, 15, -30))
 	signPole.BrickColor = BrickColor.new("Dark stone grey")
 	signPole.Material = Enum.Material.Metal
 	signPole.Parent = sharedFolder
@@ -960,7 +948,7 @@ local function createSharedWorld()
 	signBoard.Anchored = true
 	signBoard.CanCollide = false
 	signBoard.Size = Vector3.new(20, 6, 1)
-	signBoard.CFrame = CFrame.new(Vector3.new(0, 33, 0))
+	signBoard.CFrame = CFrame.new(Vector3.new(0, 33, -30))
 	signBoard.BrickColor = BrickColor.new("Olive")
 	signBoard.Material = Enum.Material.Metal
 	signBoard.Parent = sharedFolder
